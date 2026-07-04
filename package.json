@@ -1,0 +1,26 @@
+{
+  "name": "signal",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Xero receivables intelligence — reads via MCP, derives payment/churn signals, writes quotes/invoices/payments back to Xero",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev:api": "npm run dev --workspace @signal/api",
+    "dev:web": "npm run dev --workspace @signal/web",
+    "typecheck": "tsc -b"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
