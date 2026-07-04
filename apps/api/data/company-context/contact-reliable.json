@@ -1,0 +1,18 @@
+{
+  "contactId": "contact-reliable",
+  "companyName": "Reliable Rita Ltd",
+  "role": "customer",
+  "companyNumber": "07001001",
+  "companiesHouse": {
+    "companyNumber": "07001001",
+    "companyName": "RELIABLE RITA LTD",
+    "status": "active",
+    "incorporatedOn": "2012-01-20",
+    "flags": [],
+    "filings": [],
+    "profileUrl": "https://find-and-update.company-information.service.gov.uk/company/07001001",
+    "lastChecked": "2026-07-04"
+  },
+  "news": [],
+  "updatedAt": "2026-07-04"
+}

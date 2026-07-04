@@ -1,0 +1,27 @@
+{
+  "contactId": "contact-grim",
+  "companyName": "Grim Materials Ltd",
+  "role": "both",
+  "companyNumber": "05554443",
+  "companiesHouse": {
+    "companyNumber": "05554443",
+    "companyName": "GRIM MATERIALS LTD",
+    "status": "active",
+    "incorporatedOn": "2008-09-30",
+    "flags": [
+      "accounts-overdue"
+    ],
+    "filings": [
+      {
+        "date": "2026-05-20",
+        "type": "AA",
+        "description": "Accounts overdue — compliance notice issued",
+        "pdfUrl": "https://find-and-update.company-information.service.gov.uk/company/05554443/filing-history/AA/document?format=pdf"
+      }
+    ],
+    "profileUrl": "https://find-and-update.company-information.service.gov.uk/company/05554443",
+    "lastChecked": "2026-07-04"
+  },
+  "news": [],
+  "updatedAt": "2026-07-04"
+}

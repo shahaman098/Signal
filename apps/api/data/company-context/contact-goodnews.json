@@ -1,0 +1,34 @@
+{
+  "contactId": "contact-goodnews",
+  "companyName": "Grow Fast Ltd",
+  "role": "customer",
+  "companyNumber": "12345678",
+  "companiesHouse": {
+    "companyNumber": "12345678",
+    "companyName": "GROW FAST LTD",
+    "status": "active",
+    "incorporatedOn": "2021-06-01",
+    "flags": [],
+    "filings": [
+      {
+        "date": "2025-12-16",
+        "type": "AA",
+        "description": "Full accounts filed on time",
+        "pdfUrl": "https://find-and-update.company-information.service.gov.uk/company/12345678/filing-history/AA/document?format=pdf"
+      }
+    ],
+    "profileUrl": "https://find-and-update.company-information.service.gov.uk/company/12345678",
+    "lastChecked": "2026-07-04"
+  },
+  "news": [
+    {
+      "date": "2026-06-14",
+      "title": "Grow Fast Ltd raises £2m seed round to expand operations",
+      "source": "TechRound",
+      "url": "https://www.techround.example/grow-fast-seed-round",
+      "sentiment": "positive",
+      "summary": "Funding earmarked for headcount and new regional sites."
+    }
+  ],
+  "updatedAt": "2026-07-04"
+}

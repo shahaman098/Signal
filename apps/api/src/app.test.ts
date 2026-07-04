@@ -1,15 +1,27 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { mkdtempSync } from "node:fs";
+import { readFile, readdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { createApp } from "./app.js";
 import { FakeXeroAdapter } from "./adapters/fake-xero.adapter.js";
+import { FakeCompanyIntelAdapter, FakeNewsAdapter } from "./adapters/fake-intel.adapter.js";
 import { ChaseEmailDrafter } from "./llm/chase-email.js";
 
 function makeApp() {
   const xero = new FakeXeroAdapter();
-  // No API key → chase-email drafter uses its offline template.
-  const emailDrafter = new ChaseEmailDrafter("", "claude-opus-4-8");
-  const app = createApp({ xero, emailDrafter, cacheTtlMs: 0 });
-  return { app, xero };
+  const contextDir = mkdtempSync(join(tmpdir(), "signal-ctx-"));
+  const { app, services } = createApp({
+    xero,
+    intel: new FakeCompanyIntelAdapter(),
+    news: new FakeNewsAdapter(),
+    // No API key → chase emails + agent decisions use offline fallbacks.
+    emailDrafter: new ChaseEmailDrafter("", "claude-opus-4-8"),
+    contextDir,
+    cacheTtlMs: 0,
+  });
+  return { app, xero, services, contextDir };
 }
 
 describe("API — reads & analysis", () => {
@@ -41,10 +53,88 @@ describe("API — reads & analysis", () => {
     expect(res.body[0].band).toBe("high");
   });
 
-  it("GET /api/analytics/contacts", async () => {
+  it("GET /api/analytics/contacts includes the enriched archetypes", async () => {
     const res = await request(app).get("/api/analytics/contacts");
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(4);
+    expect(res.body.length).toBe(12);
+    const ids = res.body.map((c: { contactId: string }) => c.contactId);
+    expect(ids).toContain("contact-distress");
+    expect(ids).toContain("contact-grim");
+  });
+});
+
+describe("API — signals & company intelligence", () => {
+  it("GET /api/signals covers all five categories and prioritises distress", async () => {
+    const { app } = makeApp();
+    const res = await request(app).get("/api/signals");
+    expect(res.status).toBe(200);
+    const { signals, countsByCategory } = res.body;
+    expect(countsByCategory["cash-recovery"]).toBeGreaterThan(0);
+    expect(countsByCategory["revenue-growth"]).toBeGreaterThan(0);
+    expect(countsByCategory["cashflow-timing"]).toBeGreaterThan(0);
+    expect(countsByCategory.strategic).toBeGreaterThan(0);
+    expect(countsByCategory.anomaly).toBeGreaterThan(0);
+    // The CH-distressed customer's collection tops the list.
+    expect(signals[0].type).toBe("distress-collection");
+    expect(signals[0].contactId).toBe("contact-distress");
+  });
+
+  it("filters by ?category=", async () => {
+    const { app } = makeApp();
+    const res = await request(app).get("/api/signals?category=anomaly");
+    expect(res.status).toBe(200);
+    expect(res.body.signals.length).toBeGreaterThan(0);
+    for (const s of res.body.signals) expect(s.category).toBe("anomaly");
+  });
+
+  it("ingestion writes one context JSON file per company", async () => {
+    const { app, contextDir } = makeApp();
+    const res = await request(app).post("/api/context/refresh");
+    expect(res.status).toBe(200);
+    expect(res.body.updated).toBe(12);
+    const files = (await readdir(contextDir)).filter((f) => f.endsWith(".json"));
+    expect(files.length).toBe(12);
+    // Spot-check the distressed customer's file: CH flags + filing PDF + news link.
+    const dana = JSON.parse(await readFile(join(contextDir, "contact-distress.json"), "utf8"));
+    expect(dana.companiesHouse.flags).toContain("gazette-strike-off-notice");
+    expect(dana.companiesHouse.filings[0].pdfUrl).toMatch(/company-information\.service\.gov\.uk/);
+    expect(dana.news[0].url).toMatch(/^https:\/\//);
+    expect(dana.news[0].sentiment).toBe("negative");
+  });
+
+  it("GET /api/context/:contactId serves the full company document", async () => {
+    const { app } = makeApp();
+    await request(app).post("/api/context/refresh");
+    const res = await request(app).get("/api/context/contact-goodnews");
+    expect(res.status).toBe(200);
+    expect(res.body.companyName).toBe("Grow Fast Ltd");
+    expect(res.body.news[0].title).toMatch(/£2m seed round/);
+  });
+
+  it("GET /api/context/:contactId 404s for unknown companies", async () => {
+    const { app } = makeApp();
+    const res = await request(app).get("/api/context/nope");
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("API — agent decisions", () => {
+  it("POST /api/agent/decide returns prioritised decisions with reasoning", async () => {
+    const { app } = makeApp();
+    const res = await request(app).post("/api/agent/decide");
+    expect(res.status).toBe(200);
+    const { decisions, decidedBy } = res.body;
+    expect(decidedBy).toBe("rules"); // offline fallback
+    expect(decisions.length).toBeGreaterThan(10);
+    // Distress collection is decided first and acted on now.
+    expect(decisions[0].signalId).toMatch(/^distress-collection/);
+    expect(decisions[0].decision).toBe("act-now");
+    expect(decisions[0].reasoning).toMatch(/gazette-strike-off-notice/);
+    // Every decision carries a concrete action and reasoning.
+    for (const d of decisions) {
+      expect(d.action.kind).toBeTruthy();
+      expect(d.reasoning.length).toBeGreaterThan(10);
+    }
   });
 });
 
@@ -95,9 +185,7 @@ describe("API — writes & actions", () => {
     const { app } = makeApp();
     const res = await request(app).get("/api/actions/reactivation-proposals");
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
     expect(res.body.length).toBeGreaterThan(0);
-    // The lapsed customer should be among the proposals.
     expect(res.body.map((p: { contactId: string }) => p.contactId)).toContain("contact-lapsed");
     expect(res.body[0].quote.lineItems.length).toBeGreaterThan(0);
   });

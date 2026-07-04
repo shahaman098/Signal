@@ -6,12 +6,16 @@ export default async function DashboardPage() {
   let report: Awaited<ReturnType<typeof api.report>>;
   let recoverable: Awaited<ReturnType<typeof api.recoverable>>;
   let proposals: Awaited<ReturnType<typeof api.reactivationProposals>>;
+  let signalRun: Awaited<ReturnType<typeof api.signals>>;
+  let agentRun: Awaited<ReturnType<typeof api.agentDecide>>;
 
   try {
-    [report, recoverable, proposals] = await Promise.all([
+    [report, recoverable, proposals, signalRun, agentRun] = await Promise.all([
       api.report(),
       api.recoverable(),
       api.reactivationProposals(),
+      api.signals(),
+      api.agentDecide(),
     ]);
   } catch {
     return (
@@ -39,9 +43,81 @@ export default async function DashboardPage() {
       <section style={kpiRow}>
         <Kpi label="Outstanding" value={money(recoverable.totalOutstanding)} />
         <Kpi label="Expected recoverable" value={money(recoverable.totalExpectedRecoverable)} />
-        <Kpi label="High slip-risk invoices" value={String(report.slipRisk.filter((r) => r.band === "high").length)} />
-        <Kpi label="High churn-risk customers" value={String(report.churn.filter((c) => c.band === "high").length)} />
+        <Kpi label="Active signals" value={String(signalRun.signals.length)} />
+        <Kpi
+          label="Urgent / high"
+          value={String((signalRun.countsBySeverity["urgent"] ?? 0) + (signalRun.countsBySeverity["high"] ?? 0))}
+        />
       </section>
+
+      <Card title={`Agent decisions — decided by ${agentRun.decidedBy}`}>
+        <table style={table}>
+          <thead>
+            <tr>
+              <Th>#</Th>
+              <Th>Decision</Th>
+              <Th>Signal</Th>
+              <Th>Action</Th>
+              <Th>Reasoning</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {agentRun.decisions.slice(0, 12).map((d) => (
+              <tr key={d.signalId}>
+                <Td>{d.priority}</Td>
+                <Td>
+                  <Badge band={d.decision === "act-now" ? "high" : d.decision === "schedule" ? "medium" : "low"}>
+                    {d.decision}
+                  </Badge>
+                </Td>
+                <Td>{d.signalTitle}</Td>
+                <Td>{d.action.kind}</Td>
+                <Td>
+                  <span style={{ color: "#9aa0ad", fontSize: 12 }}>{d.reasoning.slice(0, 180)}…</span>
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+
+      <Card title="Signals by category">
+        {(["cash-recovery", "revenue-growth", "cashflow-timing", "strategic", "anomaly"] as const).map(
+          (cat) => {
+            const items = signalRun.signals.filter((s) => s.category === cat);
+            if (items.length === 0) return null;
+            return (
+              <div key={cat} style={{ marginBottom: 14 }}>
+                <h3 style={{ fontSize: 14, margin: "6px 0", color: "#c8ccd6" }}>
+                  {cat} ({items.length})
+                </h3>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {items.slice(0, 5).map((s) => (
+                    <li key={s.id} style={{ marginBottom: 6, fontSize: 13 }}>
+                      <Badge band={s.severity === "urgent" || s.severity === "high" ? "high" : s.severity === "medium" ? "medium" : "low"}>
+                        {s.severity}
+                      </Badge>{" "}
+                      {s.title}
+                      {s.evidence.some((e) => e.url) && (
+                        <span style={{ marginLeft: 6 }}>
+                          {s.evidence
+                            .filter((e) => e.url)
+                            .slice(0, 2)
+                            .map((e) => (
+                              <a key={e.url} href={e.url} style={{ color: "#6ea8fe", fontSize: 12, marginRight: 8 }}>
+                                {e.label.slice(0, 40)}
+                              </a>
+                            ))}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          },
+        )}
+      </Card>
 
       <Card title="Slip-risk — overdue invoices ranked">
         <table style={table}>

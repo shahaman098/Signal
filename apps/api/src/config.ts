@@ -12,6 +12,14 @@ export interface AppConfig {
     apiKey: string;
     model: string;
   };
+  companiesHouse: {
+    apiKey: string;
+    stream: boolean;
+  };
+  news: {
+    apiKey: string;
+  };
+  contextDir: string;
 }
 
 function env(name: string, fallback = ""): string {
@@ -36,5 +44,13 @@ export function loadConfig(): AppConfig {
       apiKey: env("ANTHROPIC_API_KEY"),
       model: env("CLAUDE_MODEL", "claude-opus-4-8"),
     },
+    companiesHouse: {
+      apiKey: env("COMPANIES_HOUSE_API_KEY"),
+      stream: env("COMPANIES_HOUSE_STREAM", "true") !== "false",
+    },
+    news: {
+      apiKey: env("NEWS_API_KEY"),
+    },
+    contextDir: env("CONTEXT_DIR", "data/company-context"),
   };
 }

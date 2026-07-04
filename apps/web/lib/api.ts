@@ -1,10 +1,12 @@
 import type {
   ChurnSignal,
+  CompanyContext,
   Contact,
   OrderCadence,
   PaymentPattern,
   ReceivablesReport,
   RecoverableSummary,
+  SignalRunResult,
   SlipRisk,
 } from "@signal/core";
 
@@ -40,7 +42,27 @@ export interface ChaseEmailDraft {
   generatedBy: "claude" | "template";
 }
 
+export interface AgentDecision {
+  signalId: string;
+  signalTitle: string;
+  decision: "act-now" | "schedule" | "monitor" | "dismiss";
+  priority: number;
+  reasoning: string;
+  action: { kind: string; [k: string]: unknown };
+  decidedBy: "claude" | "rules";
+}
+
+export interface AgentRunResult {
+  asOf: string;
+  decisions: AgentDecision[];
+  decidedBy: "claude" | "rules";
+}
+
 export const api = {
+  signals: () => get<SignalRunResult>("/api/signals"),
+  contexts: () => get<CompanyContext[]>("/api/context"),
+  context: (contactId: string) => get<CompanyContext>(`/api/context/${contactId}`),
+  agentDecide: () => post<AgentRunResult>("/api/agent/decide", {}),
   report: () => get<ReceivablesReport>("/api/analytics/report"),
   contacts: () => get<Contact[]>("/api/analytics/contacts"),
   slipRisk: () => get<SlipRisk[]>("/api/analytics/slip-risk"),

@@ -1,5 +1,5 @@
 import {
-  makeDemoSnapshot,
+  makeEnrichedDemoSnapshot,
   type AgedReceivable,
   type Contact,
   type CreateInvoiceDraftInput,
@@ -26,7 +26,7 @@ export class FakeXeroAdapter implements XeroPort {
   };
   private counter = 0;
 
-  constructor(snapshot: XeroSnapshot = makeDemoSnapshot()) {
+  constructor(snapshot: XeroSnapshot = makeEnrichedDemoSnapshot()) {
     this.snapshotData = snapshot;
   }
 

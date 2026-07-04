@@ -1,0 +1,43 @@
+{
+  "contactId": "contact-distress",
+  "companyName": "Dana Retail Ltd",
+  "role": "customer",
+  "companyNumber": "09876543",
+  "companiesHouse": {
+    "companyNumber": "09876543",
+    "companyName": "DANA RETAIL LTD",
+    "status": "active",
+    "incorporatedOn": "2015-03-11",
+    "flags": [
+      "accounts-overdue",
+      "gazette-strike-off-notice"
+    ],
+    "filings": [
+      {
+        "date": "2026-06-16",
+        "type": "GAZ1",
+        "description": "First Gazette notice for compulsory strike-off",
+        "pdfUrl": "https://find-and-update.company-information.service.gov.uk/company/09876543/filing-history/GAZ1/document?format=pdf"
+      },
+      {
+        "date": "2026-03-06",
+        "type": "AA",
+        "description": "Accounts overdue — last filed FY2024",
+        "pdfUrl": "https://find-and-update.company-information.service.gov.uk/company/09876543/filing-history/AA/document?format=pdf"
+      }
+    ],
+    "profileUrl": "https://find-and-update.company-information.service.gov.uk/company/09876543",
+    "lastChecked": "2026-07-04"
+  },
+  "news": [
+    {
+      "date": "2026-06-22",
+      "title": "Dana Retail faces winding-up petition from trade creditor",
+      "source": "Retail Gazette",
+      "url": "https://www.retailgazette.example/dana-retail-winding-up",
+      "sentiment": "negative",
+      "summary": "Supplier petitions court over unpaid balances; company disputes the amount."
+    }
+  ],
+  "updatedAt": "2026-07-04"
+}

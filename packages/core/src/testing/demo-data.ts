@@ -27,8 +27,8 @@ function daysAgo(n: number): string {
   return new Date(base.getTime() - n * DAY_MS).toISOString().slice(0, 10);
 }
 
-function line(description: string, amount: number): LineItem {
-  return { description, quantity: 1, unitAmount: amount, lineAmount: amount, accountCode: "200" };
+function line(description: string, amount: number, itemCode = "SVC-A"): LineItem {
+  return { description, quantity: 1, unitAmount: amount, lineAmount: amount, accountCode: "200", itemCode };
 }
 
 const contacts: Contact[] = [
@@ -48,6 +48,7 @@ function paidInvoice(
   termDays: number,
   daysLate: number,
   amount: number,
+  itemCode = "SVC-A",
 ): void {
   seq += 1;
   const id = `inv-${seq}`;
@@ -64,7 +65,7 @@ function paidInvoice(
     total: amount,
     amountDue: 0,
     amountPaid: amount,
-    lineItems: [line("Monthly service", amount)],
+    lineItems: [line("Monthly service", amount, itemCode)],
   });
   payments.push({ paymentId: `pay-${seq}`, invoiceId: id, date: paidDate, amount });
 }
@@ -74,6 +75,7 @@ function overdueInvoice(
   issuedDaysAgo: number,
   termDays: number,
   amount: number,
+  itemCode = "SVC-A",
 ): void {
   seq += 1;
   const id = `inv-${seq}`;
@@ -87,7 +89,7 @@ function overdueInvoice(
     total: amount,
     amountDue: amount,
     amountPaid: 0,
-    lineItems: [line("Monthly service", amount)],
+    lineItems: [line("Monthly service", amount, itemCode)],
   });
 }
 
@@ -107,19 +109,20 @@ invoices.push({
 });
 
 // Chronic Chris: pays late and getting worse (10d → 35d), plus two overdue balances.
-paidInvoice("contact-chronic", 180, 20, 10, 2000);
-paidInvoice("contact-chronic", 150, 20, 14, 2000);
-paidInvoice("contact-chronic", 120, 20, 22, 2000);
-paidInvoice("contact-chronic", 90, 20, 33, 2000);
-paidInvoice("contact-chronic", 60, 20, 38, 2000);
-overdueInvoice("contact-chronic", 70, 20, 3500); // ~50 days overdue
-overdueInvoice("contact-chronic", 40, 20, 1500); // ~20 days overdue
+paidInvoice("contact-chronic", 180, 20, 10, 3000, "SVC-C");
+paidInvoice("contact-chronic", 150, 20, 14, 3000, "SVC-C");
+paidInvoice("contact-chronic", 120, 20, 22, 3000, "SVC-C");
+paidInvoice("contact-chronic", 90, 20, 33, 3000, "SVC-C");
+paidInvoice("contact-chronic", 60, 20, 38, 3000, "SVC-C");
+overdueInvoice("contact-chronic", 70, 20, 3500, "SVC-C"); // ~50 days overdue
+overdueInvoice("contact-chronic", 40, 20, 1500, "SVC-C"); // ~20 days overdue
 
-// Lapsed Lucy: regular last year, nothing for ~210 days; all historical paid on time.
-for (let m = 12; m >= 8; m--) paidInvoice("contact-lapsed", m * 30, 30, 1, 800);
+// Lapsed Lucy: was regular but her order gap stretched (30 → 45 → 60 days)
+// before going silent ~7 months ago — the classic pre-churn trajectory.
+for (const d of [390, 360, 330, 285, 225]) paidInvoice("contact-lapsed", d, 30, 1, 1200, "SVC-D");
 
 // New Nick: single recent order, paid promptly.
-paidInvoice("contact-new", 12, 20, 0, 500);
+paidInvoice("contact-new", 12, 20, 0, 500, "SVC-D");
 
 const agedReceivables: AgedReceivable[] = [
   { contactId: "contact-reliable", current: 1000, days1to30: 0, days31to60: 0, days61to90: 0, older: 0, total: 1000 },

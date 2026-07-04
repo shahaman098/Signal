@@ -23,6 +23,8 @@ export interface LineItem {
   lineAmount: number;
   accountCode?: string;
   itemCode?: string;
+  /** Optional unit cost — enables margin analysis when known. */
+  unitCost?: number;
 }
 
 export interface Contact {
@@ -79,6 +81,27 @@ export interface ProfitAndLossRow {
   section: "revenue" | "expense" | "other";
 }
 
+/** A supplier we buy from (money-out side). */
+export interface Supplier {
+  supplierId: string;
+  name: string;
+  contactId?: string; // when the supplier is also a Xero contact
+}
+
+/** A bill (accounts payable) — the money-out mirror of an invoice. */
+export interface Bill {
+  billId: string;
+  supplierId: string;
+  supplierName: string;
+  issueDate: ISODate;
+  dueDate: ISODate;
+  total: number;
+  amountDue: number;
+  status: "AUTHORISED" | "PAID" | "DRAFT" | "VOIDED";
+  /** Early-payment discount terms, when the supplier offers one. */
+  earlyPaymentDiscount?: { percent: number; ifPaidBy: ISODate };
+}
+
 /**
  * A dataset snapshot pulled from Xero for a given tenant, passed as the sole
  * input to the analysis layer. Everything the derivations need lives here so
@@ -92,4 +115,7 @@ export interface XeroSnapshot {
   agedReceivables: AgedReceivable[];
   bankTransactions?: BankTransaction[];
   profitAndLoss?: ProfitAndLossRow[];
+  /** Money-out side (optional reads). */
+  bills?: Bill[];
+  suppliers?: Supplier[];
 }
