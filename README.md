@@ -1,4 +1,4 @@
-# Signal — Xero Receivables Intelligence
+# Signal - Xero Intelligence
 
 Reads accounting data from **Xero (via MCP)**, derives payment/churn signals, and writes
 quotes, draft invoices and payments back to Xero. Chase emails are drafted by Claude and
