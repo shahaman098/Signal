@@ -1,0 +1,49 @@
+{
+  "contactId": "contact-goodnews",
+  "companyName": "Grow Fast Ltd",
+  "role": "customer",
+  "companyNumber": "16534124",
+  "companiesHouse": {
+    "companyNumber": "16534124",
+    "companyName": "GROW FAST LTD.",
+    "status": "active",
+    "incorporatedOn": "2025-06-23",
+    "flags": [],
+    "filings": [
+      {
+        "date": "2025-11-19",
+        "type": "SH01",
+        "description": "Capital allotment shares — 2025-11-19, [object Object]",
+        "pdfUrl": "https://find-and-update.company-information.service.gov.uk/company/16534124/filing-history/MzQ4OTgxOTQwOWFkaXF6a2N4/document?format=pdf&download=0"
+      },
+      {
+        "date": "2025-10-17",
+        "type": "PSC04",
+        "description": "Change to a person with significant control — 2025-10-05, Mr Jake Holmes",
+        "pdfUrl": "https://find-and-update.company-information.service.gov.uk/company/16534124/filing-history/MzQ4NTM2Nzk4N2FkaXF6a2N4/document?format=pdf&download=0"
+      },
+      {
+        "date": "2025-10-17",
+        "type": "PSC01",
+        "description": "Notification of a person with significant control — Meghan Victoria Thorneloe, 2025-10-05",
+        "pdfUrl": "https://find-and-update.company-information.service.gov.uk/company/16534124/filing-history/MzQ4NTM2NzM0MmFkaXF6a2N4/document?format=pdf&download=0"
+      },
+      {
+        "date": "2025-10-17",
+        "type": "AP01",
+        "description": "Appoint person director company — Ms Meghan Victoria Thorneloe, 2025-10-05",
+        "pdfUrl": "https://find-and-update.company-information.service.gov.uk/company/16534124/filing-history/MzQ4NTM2NzA0M2FkaXF6a2N4/document?format=pdf&download=0"
+      },
+      {
+        "date": "2025-06-23",
+        "type": "NEWINC",
+        "description": "Incorporation company",
+        "pdfUrl": "https://find-and-update.company-information.service.gov.uk/company/16534124/filing-history/MzQ3MTA2MDk4MmFkaXF6a2N4/document?format=pdf&download=0"
+      }
+    ],
+    "profileUrl": "https://find-and-update.company-information.service.gov.uk/company/16534124",
+    "lastChecked": "2026-07-04"
+  },
+  "news": [],
+  "updatedAt": "2026-07-04"
+}

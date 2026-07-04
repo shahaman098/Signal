@@ -15,27 +15,47 @@ export class NewsApiAdapter implements NewsPort {
     const since = new Date(Date.now() - (opts?.sinceDays ?? 90) * 86_400_000)
       .toISOString()
       .slice(0, 10);
-    const url =
-      `${this.baseUrl}/everything?q="${encodeURIComponent(companyName)}"` +
-      `&from=${since}&sortBy=publishedAt&pageSize=10&language=en`;
+    // Search the core trading name ("Greggs", not "Greggs plc") — legal suffixes
+    // rarely appear in headlines and an exact-phrase match would miss everything.
+    const needle = coreName(companyName);
+    const base =
+      `${this.baseUrl}/everything?q="${encodeURIComponent(needle)}"` +
+      `&sortBy=publishedAt&pageSize=10&language=en`;
     try {
-      const res = await fetch(url, { headers: { "X-Api-Key": this.apiKey } });
+      let res = await fetch(`${base}&from=${since}`, { headers: { "X-Api-Key": this.apiKey } });
+      if (res.status === 426) {
+        // Free tier limits how far back `from` may reach — retry without it and
+        // let the plan's default window apply.
+        res = await fetch(base, { headers: { "X-Api-Key": this.apiKey } });
+      }
       if (!res.ok) return [];
       const body = (await res.json()) as {
         articles?: { publishedAt: string; title: string; url: string; source?: { name?: string }; description?: string }[];
       };
-      return (body.articles ?? []).map((a) => ({
-        date: a.publishedAt.slice(0, 10),
-        title: a.title,
-        source: a.source?.name ?? "unknown",
-        url: a.url,
-        sentiment: classify(`${a.title} ${a.description ?? ""}`),
-        summary: a.description,
-      }));
+      // NewsAPI matches loosely across fields — keep only articles that actually
+      // mention the company in their title or description.
+      return (body.articles ?? [])
+        .filter((a) => `${a.title} ${a.description ?? ""}`.toLowerCase().includes(needle))
+        .map((a) => ({
+          date: a.publishedAt.slice(0, 10),
+          title: a.title,
+          source: a.source?.name ?? "unknown",
+          url: a.url,
+          sentiment: classify(`${a.title} ${a.description ?? ""}`),
+          summary: a.description,
+        }));
     } catch {
       return [];
     }
   }
+}
+
+/** "Greggs plc" → "greggs": strip legal suffixes for matching. */
+function coreName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\b(ltd|limited|plc|llp|inc|gmbh|co|company)\b\.?/g, "")
+    .trim();
 }
 
 const POSITIVE = /\b(raises|funding|seed round|series [a-c]|expansion|expands|acquires|record profit|growth|new contract|wins)\b/i;

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api, type ChaseEmailDraft } from "../lib/api";
+import { Mail } from "./icons";
 
 /** Client component: requests a Claude-drafted chase email for one invoice. */
 export function ChaseEmailButton({ invoiceId }: { invoiceId: string }) {
@@ -23,28 +24,19 @@ export function ChaseEmailButton({ invoiceId }: { invoiceId: string }) {
 
   return (
     <div>
-      <button onClick={onClick} disabled={loading} style={btn}>
-        {loading ? "Drafting…" : "Draft chase email"}
+      <button className="btn" onClick={onClick} disabled={loading}>
+        <Mail size={14} /> {loading ? "Drafting…" : "Draft chase email"}
       </button>
-      {error && <div style={{ color: "#ff6b6b", fontSize: 12 }}>{error}</div>}
+      {error && <div style={{ color: "var(--critical)", fontSize: 12, marginTop: 4 }}>{error}</div>}
       {draft && (
-        <details open style={{ marginTop: 6, maxWidth: 360 }}>
-          <summary style={{ cursor: "pointer", fontSize: 12, color: "#9aa0ad" }}>
-            {draft.subject} · via {draft.generatedBy}
-          </summary>
-          <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, color: "#c8ccd6" }}>{draft.body}</pre>
-        </details>
+        <div className="draft">
+          <div className="draft-subject">
+            {draft.subject}
+            <span style={{ color: "var(--muted)", fontWeight: 400 }}> · via {draft.generatedBy}</span>
+          </div>
+          <pre>{draft.body}</pre>
+        </div>
       )}
     </div>
   );
 }
-
-const btn: React.CSSProperties = {
-  background: "#2b64f5",
-  color: "white",
-  border: "none",
-  borderRadius: 8,
-  padding: "6px 10px",
-  cursor: "pointer",
-  fontSize: 12,
-};

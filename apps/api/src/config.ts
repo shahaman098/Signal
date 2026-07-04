@@ -14,7 +14,8 @@ export interface AppConfig {
   };
   companiesHouse: {
     apiKey: string;
-    stream: boolean;
+    /** Separate credential — CH streaming keys are distinct from REST keys. */
+    streamKey: string;
   };
   news: {
     apiKey: string;
@@ -46,7 +47,7 @@ export function loadConfig(): AppConfig {
     },
     companiesHouse: {
       apiKey: env("COMPANIES_HOUSE_API_KEY"),
-      stream: env("COMPANIES_HOUSE_STREAM", "true") !== "false",
+      streamKey: env("COMPANIES_HOUSE_STREAM_KEY"),
     },
     news: {
       apiKey: env("NEWS_API_KEY"),

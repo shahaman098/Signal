@@ -59,8 +59,9 @@ async function main(): Promise<void> {
     .catch((err) => console.error("[ingestion] initial refresh failed:", err));
 
   // Companies House real-time stream: registry changes for tracked companies
-  // trigger an immediate re-ingest of that company's context.
-  if (config.companiesHouse.apiKey && config.companiesHouse.stream) {
+  // trigger an immediate re-ingest. Requires a dedicated STREAM key — CH issues
+  // those separately from REST keys.
+  if (config.companiesHouse.streamKey) {
     let tracked = new Set<string>();
     const refreshTracked = async () => {
       tracked = await services.ingestion.trackedCompanyNumbers();
@@ -69,7 +70,7 @@ async function main(): Promise<void> {
     setInterval(() => void refreshTracked(), 10 * 60 * 1000).unref();
 
     const stream = new CompaniesHouseStream(
-      config.companiesHouse.apiKey,
+      config.companiesHouse.streamKey,
       () => tracked,
       (event) => {
         console.log(`[ch-stream] change event for ${event.companyNumber} — refreshing context`);
@@ -78,12 +79,18 @@ async function main(): Promise<void> {
       (msg) => console.log(msg),
     );
     stream.start();
+  } else {
+    // No stream key: fall back to slow polling so contexts don't go stale.
+    setInterval(
+      () => services.ingestion.refreshAll().catch(() => {}),
+      12 * 60 * 60 * 1000,
+    ).unref();
   }
 
   app.listen(config.port, () => {
     console.log(
       `[api] listening on :${config.port} (xero: ${config.xeroAdapter}, ` +
-        `companies-house: ${config.companiesHouse.apiKey ? (config.companiesHouse.stream ? "rest+stream" : "rest") : "fake"}, ` +
+        `companies-house: ${config.companiesHouse.apiKey ? (config.companiesHouse.streamKey ? "rest+stream" : "rest, polling") : "fake"}, ` +
         `news: ${config.news.apiKey ? "newsapi" : "fake"})`,
     );
   });

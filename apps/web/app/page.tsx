@@ -1,228 +1,464 @@
-import { api } from "../lib/api";
+import type { Severity, Signal, SignalCategory } from "@signal/core";
+import { api, type AgentDecision } from "../lib/api";
 import { ChaseEmailButton } from "./chase-email-button";
+import {
+  AlertOctagon,
+  AlertTriangle,
+  Banknote,
+  Building,
+  Calendar,
+  CircleCheck,
+  Clock,
+  Compass,
+  ExternalLink,
+  Eye,
+  FileText,
+  InfoCircle,
+  Mail,
+  Radar,
+  Sparkles,
+  TrendUp,
+  XCircle,
+  Zap,
+} from "./icons";
 
-// Server component: fetches the analysis report from the Express API on each load.
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
-  let report: Awaited<ReturnType<typeof api.report>>;
-  let recoverable: Awaited<ReturnType<typeof api.recoverable>>;
-  let proposals: Awaited<ReturnType<typeof api.reactivationProposals>>;
-  let signalRun: Awaited<ReturnType<typeof api.signals>>;
-  let agentRun: Awaited<ReturnType<typeof api.agentDecide>>;
-
+  let data: Awaited<ReturnType<typeof loadData>>;
   try {
-    [report, recoverable, proposals, signalRun, agentRun] = await Promise.all([
-      api.report(),
-      api.recoverable(),
-      api.reactivationProposals(),
-      api.signals(),
-      api.agentDecide(),
-    ]);
+    data = await loadData();
   } catch {
     return (
       <main>
-        <h1>Signal</h1>
-        <p style={{ color: "#f0a" }}>
-          Couldn&apos;t reach the API. Start it with <code>npm run dev:api</code> and reload.
-        </p>
+        <Masthead sub="Xero · Companies House · news → signals → agent decisions" />
+        <div className="err-banner">
+          <AlertOctagon size={20} />
+          <div>
+            Couldn&apos;t reach the API. Start it with <code>npm run dev:api</code> and reload this page.
+          </div>
+        </div>
       </main>
     );
   }
 
-  const contactName = new Map(report.paymentPatterns.map((p) => [p.contactId, p.contactId]));
-  for (const c of proposals) contactName.set(c.contactId, c.contactName);
+  const { report, recoverable, proposals, signalRun, agentRun, contacts, contexts } = data;
+  const name = new Map(contacts.map((c) => [c.contactId, c.name]));
+  const urgentHigh =
+    (signalRun.countsBySeverity["urgent"] ?? 0) + (signalRun.countsBySeverity["high"] ?? 0);
 
   return (
     <main>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Signal</h1>
-        <p style={{ color: "#9aa0ad", marginTop: 4 }}>
-          Xero receivables intelligence — as of {report.asOf}
-        </p>
-      </header>
+      <Masthead sub={`As of ${report.asOf} · ${signalRun.signals.length} signals · decided by ${agentRun.decidedBy}`} />
 
-      <section style={kpiRow}>
-        <Kpi label="Outstanding" value={money(recoverable.totalOutstanding)} />
-        <Kpi label="Expected recoverable" value={money(recoverable.totalExpectedRecoverable)} />
-        <Kpi label="Active signals" value={String(signalRun.signals.length)} />
-        <Kpi
-          label="Urgent / high"
-          value={String((signalRun.countsBySeverity["urgent"] ?? 0) + (signalRun.countsBySeverity["high"] ?? 0))}
-        />
+      {/* ---- KPIs ---- */}
+      <section className="kpis">
+        <Kpi icon={<Banknote size={20} />} tint="var(--blue)" label="Outstanding receivables" value={gbp(recoverable.totalOutstanding)} />
+        <Kpi icon={<CircleCheck size={20} />} tint="var(--good-text)" label="Expected recoverable" value={gbp(recoverable.totalExpectedRecoverable)} />
+        <Kpi icon={<Sparkles size={20} />} tint="var(--violet)" label="Active signals" value={String(signalRun.signals.length)} />
+        <Kpi icon={<AlertTriangle size={20} />} tint="var(--critical)" label="Urgent + high priority" value={String(urgentHigh)} />
       </section>
 
-      <Card title={`Agent decisions — decided by ${agentRun.decidedBy}`}>
-        <table style={table}>
+      {/* ---- Agent decisions ---- */}
+      <section className="card">
+        <h2>
+          <Zap size={16} /> Agent decisions
+        </h2>
+        <p className="card-sub">
+          Each signal weighed against the company&apos;s full context — Companies House flags, filings and news.
+        </p>
+        <table className="data">
           <thead>
             <tr>
-              <Th>#</Th>
-              <Th>Decision</Th>
-              <Th>Signal</Th>
-              <Th>Action</Th>
-              <Th>Reasoning</Th>
+              <th style={{ width: 28 }}>#</th>
+              <th style={{ width: 110 }}>Decision</th>
+              <th>Signal</th>
+              <th style={{ width: 160 }}>Action</th>
+              <th>Why</th>
             </tr>
           </thead>
           <tbody>
-            {agentRun.decisions.slice(0, 12).map((d) => (
+            {agentRun.decisions.slice(0, 10).map((d) => (
               <tr key={d.signalId}>
-                <Td>{d.priority}</Td>
-                <Td>
-                  <Badge band={d.decision === "act-now" ? "high" : d.decision === "schedule" ? "medium" : "low"}>
-                    {d.decision}
-                  </Badge>
-                </Td>
-                <Td>{d.signalTitle}</Td>
-                <Td>{d.action.kind}</Td>
-                <Td>
-                  <span style={{ color: "#9aa0ad", fontSize: 12 }}>{d.reasoning.slice(0, 180)}…</span>
-                </Td>
+                <td className="num">{d.priority}</td>
+                <td>
+                  <DecisionBadge decision={d.decision} />
+                </td>
+                <td style={{ maxWidth: 320 }}>{d.signalTitle}</td>
+                <td>
+                  <ActionChip kind={d.action.kind} />
+                </td>
+                <td>
+                  <div className="reason">{trim(d.reasoning, 170)}</div>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </Card>
+      </section>
 
-      <Card title="Signals by category">
-        {(["cash-recovery", "revenue-growth", "cashflow-timing", "strategic", "anomaly"] as const).map(
-          (cat) => {
-            const items = signalRun.signals.filter((s) => s.category === cat);
-            if (items.length === 0) return null;
-            return (
-              <div key={cat} style={{ marginBottom: 14 }}>
-                <h3 style={{ fontSize: 14, margin: "6px 0", color: "#c8ccd6" }}>
-                  {cat} ({items.length})
-                </h3>
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {items.slice(0, 5).map((s) => (
-                    <li key={s.id} style={{ marginBottom: 6, fontSize: 13 }}>
-                      <Badge band={s.severity === "urgent" || s.severity === "high" ? "high" : s.severity === "medium" ? "medium" : "low"}>
-                        {s.severity}
-                      </Badge>{" "}
-                      {s.title}
-                      {s.evidence.some((e) => e.url) && (
-                        <span style={{ marginLeft: 6 }}>
-                          {s.evidence
-                            .filter((e) => e.url)
-                            .slice(0, 2)
-                            .map((e) => (
-                              <a key={e.url} href={e.url} style={{ color: "#6ea8fe", fontSize: 12, marginRight: 8 }}>
-                                {e.label.slice(0, 40)}
-                              </a>
-                            ))}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+      {/* ---- Signals by category ---- */}
+      <section className="cat-grid" style={{ marginBottom: 20 }}>
+        {CATEGORIES.map((cat) => {
+          const items = signalRun.signals.filter((s) => s.category === cat.key);
+          return (
+            <div className="cat-card" key={cat.key}>
+              <div className="cat-head">
+                <span
+                  className="cat-icon"
+                  style={{ background: `color-mix(in srgb, ${cat.tint} 12%, white)`, color: cat.tint }}
+                >
+                  {cat.icon}
+                </span>
+                <h3>{cat.label}</h3>
+                <span className="count">{items.length}</span>
               </div>
-            );
-          },
-        )}
-      </Card>
+              {items.length === 0 ? (
+                <p className="empty">Nothing detected.</p>
+              ) : (
+                <>
+                  {diversify(items, 6).map((s) => (
+                    <SignalRow key={s.id} signal={s} />
+                  ))}
+                  {items.length > 6 && (
+                    <p className="empty" style={{ margin: "8px 0 0" }}>
+                      + {items.length - 6} more
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
+      </section>
 
-      <Card title="Slip-risk — overdue invoices ranked">
-        <table style={table}>
+      {/* ---- Company intelligence ---- */}
+      <section className="card">
+        <h2>
+          <Building size={16} /> Company intelligence
+        </h2>
+        <p className="card-sub">
+          Companies House registry data and financial news per counterparty — refreshed by ingestion, one
+          context file per company.
+        </p>
+        <table className="data">
           <thead>
             <tr>
-              <Th>Invoice</Th>
-              <Th>Customer</Th>
-              <Th align="right">Amount due</Th>
-              <Th align="right">Days overdue</Th>
-              <Th align="right">Score</Th>
-              <Th>Why</Th>
-              <Th>Action</Th>
+              <th>Company</th>
+              <th style={{ width: 90 }}>Role</th>
+              <th>Registry (Companies House)</th>
+              <th>Latest filing</th>
+              <th>News</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...contexts]
+              .sort((a, b) => Number(!!b.companiesHouse) - Number(!!a.companiesHouse) || a.companyName.localeCompare(b.companyName))
+              .map((ctx) => {
+                const ch = ctx.companiesHouse;
+                const filing = ch?.filings[0];
+                const news = ctx.news.slice(0, 2);
+                return (
+                  <tr key={ctx.contactId}>
+                    <td>{ctx.companyName}</td>
+                    <td>
+                      <span className="chip">{ctx.role}</span>
+                    </td>
+                    <td>
+                      {ch ? (
+                        <>
+                          <a href={ch.profileUrl} target="_blank" rel="noreferrer">
+                            <ExternalLink size={12} /> {ch.companyName} ({ch.companyNumber})
+                          </a>{" "}
+                          {ch.flags.length > 0 ? (
+                            <span className="badge critical" style={{ marginLeft: 4 }}>
+                              <AlertOctagon size={13} /> {ch.flags.join(", ")}
+                            </span>
+                          ) : (
+                            <span className="badge good" style={{ marginLeft: 4 }}>
+                              <CircleCheck size={13} /> {ch.status}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="empty">no verified match</span>
+                      )}
+                    </td>
+                    <td>
+                      {filing ? (
+                        filing.pdfUrl ? (
+                          <a href={filing.pdfUrl} target="_blank" rel="noreferrer">
+                            <FileText size={12} /> {filing.date} {trim(filing.description, 34)}
+                          </a>
+                        ) : (
+                          <span className="reason">{filing.date} {trim(filing.description, 34)}</span>
+                        )
+                      ) : (
+                        <span className="empty">—</span>
+                      )}
+                    </td>
+                    <td>
+                      {news.length === 0 ? (
+                        <span className="empty">—</span>
+                      ) : (
+                        news.map((n) => (
+                          <div key={n.url} style={{ marginBottom: 2 }}>
+                            <a href={n.url} target="_blank" rel="noreferrer">
+                              <ExternalLink size={12} /> {trim(n.title, 48)}
+                            </a>{" "}
+                            <span style={{ color: "var(--muted)", fontSize: 11.5 }}>
+                              {n.source} · {n.sentiment}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+          </tbody>
+        </table>
+      </section>
+
+      {/* ---- Receivables at risk ---- */}
+      <section className="card">
+        <h2>
+          <Banknote size={16} /> Overdue invoices, ranked by slip risk
+        </h2>
+        <p className="card-sub">Chase emails are tone-matched to each customer&apos;s payment history.</p>
+        <table className="data">
+          <thead>
+            <tr>
+              <th>Invoice</th>
+              <th>Customer</th>
+              <th className="num">Amount due</th>
+              <th className="num">Days overdue</th>
+              <th style={{ width: 110 }}>Risk</th>
+              <th>Why</th>
+              <th style={{ width: 170 }}></th>
             </tr>
           </thead>
           <tbody>
             {report.slipRisk.map((r) => (
               <tr key={r.invoiceId}>
-                <Td>{r.invoiceId}</Td>
-                <Td>{contactName.get(r.contactId) ?? r.contactId}</Td>
-                <Td align="right">{money(r.amountDue)}</Td>
-                <Td align="right">{r.daysOverdue}</Td>
-                <Td align="right">
-                  <Badge band={r.band}>{r.score.toFixed(2)}</Badge>
-                </Td>
-                <Td>{r.reasons.join("; ")}</Td>
-                <Td>
+                <td>{r.invoiceId}</td>
+                <td>{name.get(r.contactId) ?? r.contactId}</td>
+                <td className="num">{gbp(r.amountDue)}</td>
+                <td className="num">{r.daysOverdue}</td>
+                <td>
+                  <RiskBadge band={r.band} score={r.score} />
+                </td>
+                <td>
+                  <div className="reason">{r.reasons.join("; ")}</div>
+                </td>
+                <td>
                   <ChaseEmailButton invoiceId={r.invoiceId} />
-                </Td>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </Card>
+      </section>
 
-      <Card title="Reactivation offers — churn-risk customers (flagship)">
+      {/* ---- Reactivation offers ---- */}
+      <section className="card">
+        <h2>
+          <TrendUp size={16} /> Reactivation offers
+        </h2>
+        <p className="card-sub">Churn-risk customers with a drafted welcome-back quote ready to send.</p>
         {proposals.length === 0 ? (
-          <p style={{ color: "#9aa0ad" }}>No customers currently flagged for reactivation.</p>
+          <p className="empty">No customers currently flagged for reactivation.</p>
         ) : (
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {proposals.map((p) => (
-              <li key={p.contactId} style={{ marginBottom: 8 }}>
-                <strong>{p.contactName}</strong>{" "}
-                <Badge band={p.churnScore >= 0.66 ? "high" : "medium"}>
-                  churn {p.churnScore.toFixed(2)}
-                </Badge>
-                <div style={{ color: "#9aa0ad", fontSize: 13 }}>{p.rationale.join(" · ")}</div>
-              </li>
-            ))}
-          </ul>
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th style={{ width: 130 }}>Churn risk</th>
+                <th>Signals</th>
+              </tr>
+            </thead>
+            <tbody>
+              {proposals.map((p) => (
+                <tr key={p.contactId}>
+                  <td>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                      <Building size={15} style={{ color: "var(--muted)" }} /> {p.contactName}
+                    </span>
+                  </td>
+                  <td>
+                    <RiskBadge band={p.churnScore >= 0.66 ? "high" : "medium"} score={p.churnScore} />
+                  </td>
+                  <td>
+                    <div className="reason">{p.rationale.join(" · ")}</div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
-      </Card>
+      </section>
     </main>
   );
 }
 
-// ---- tiny presentational helpers ----
+// ---- data ----
 
-function money(n: number): string {
-  return n.toLocaleString(undefined, { style: "currency", currency: "USD" });
+async function loadData() {
+  const [report, recoverable, proposals, signalRun, agentRun, contacts, contexts] = await Promise.all([
+    api.report(),
+    api.recoverable(),
+    api.reactivationProposals(),
+    api.signals(),
+    api.agentDecide(),
+    api.contacts(),
+    api.contexts(),
+  ]);
+  return { report, recoverable, proposals, signalRun, agentRun, contacts, contexts };
 }
 
-const kpiRow: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: 12,
-  marginBottom: 24,
-};
+// ---- presentational pieces ----
 
-function Kpi({ label, value }: { label: string; value: string }) {
+function Masthead({ sub }: { sub: string }) {
   return (
-    <div style={{ background: "#151923", borderRadius: 12, padding: 16 }}>
-      <div style={{ color: "#9aa0ad", fontSize: 13 }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{value}</div>
+    <header className="masthead">
+      <div className="brand-mark">S</div>
+      <div>
+        <h1>Signal</h1>
+        <p className="sub">{sub}</p>
+      </div>
+    </header>
+  );
+}
+
+function Kpi({ icon, tint, label, value }: { icon: React.ReactNode; tint: string; label: string; value: string }) {
+  return (
+    <div className="kpi">
+      <span className="kpi-icon" style={{ background: `color-mix(in srgb, ${tint} 11%, white)`, color: tint }}>
+        {icon}
+      </span>
+      <div>
+        <div className="kpi-label">{label}</div>
+        <div className="kpi-value">{value}</div>
+      </div>
     </div>
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+const CATEGORIES: { key: SignalCategory; label: string; tint: string; icon: React.ReactNode }[] = [
+  { key: "cash-recovery", label: "Cash recovery", tint: "var(--blue)", icon: <Banknote size={17} /> },
+  { key: "revenue-growth", label: "Revenue growth", tint: "var(--aqua)", icon: <TrendUp size={17} /> },
+  { key: "cashflow-timing", label: "Cash flow timing", tint: "var(--orange)", icon: <Clock size={17} /> },
+  { key: "strategic", label: "Strategic", tint: "var(--violet)", icon: <Compass size={17} /> },
+  { key: "anomaly", label: "Anomaly & hygiene", tint: "var(--red)", icon: <Radar size={17} /> },
+];
+
+function SignalRow({ signal }: { signal: Signal }) {
+  const links = signal.evidence.filter((e) => e.url).slice(0, 2);
   return (
-    <section style={{ background: "#151923", borderRadius: 12, padding: 20, marginBottom: 24 }}>
-      <h2 style={{ marginTop: 0, fontSize: 16 }}>{title}</h2>
-      {children}
-    </section>
+    <div className="signal-row">
+      <SeverityBadge severity={signal.severity} />
+      <div>
+        <div className="signal-title">{signal.title}</div>
+        {links.length > 0 && (
+          <div className="evidence">
+            {links.map((e) => (
+              <a key={e.url} href={e.url} target="_blank" rel="noreferrer">
+                <ExternalLink size={12} /> {trim(e.label, 42)}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
-const table: React.CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: 14 };
-
-function Th({ children, align = "left" }: { children: React.ReactNode; align?: "left" | "right" }) {
+function SeverityBadge({ severity }: { severity: Severity }) {
+  const map: Record<Severity, { cls: string; icon: React.ReactNode }> = {
+    urgent: { cls: "critical", icon: <AlertOctagon size={13} /> },
+    high: { cls: "serious", icon: <AlertTriangle size={13} /> },
+    medium: { cls: "warning", icon: <Clock size={13} /> },
+    info: { cls: "neutral", icon: <InfoCircle size={13} /> },
+  };
+  const { cls, icon } = map[severity];
   return (
-    <th style={{ textAlign: align, padding: "8px 10px", color: "#9aa0ad", borderBottom: "1px solid #262b36" }}>
-      {children}
-    </th>
+    <span className={`badge ${cls}`}>
+      {icon} {severity}
+    </span>
   );
 }
 
-function Td({ children, align = "left" }: { children: React.ReactNode; align?: "left" | "right" }) {
+function RiskBadge({ band, score }: { band: "low" | "medium" | "high"; score: number }) {
+  const map = {
+    high: { cls: "serious", icon: <AlertTriangle size={13} /> },
+    medium: { cls: "warning", icon: <Clock size={13} /> },
+    low: { cls: "good", icon: <CircleCheck size={13} /> },
+  } as const;
+  const { cls, icon } = map[band];
   return (
-    <td style={{ textAlign: align, padding: "8px 10px", borderBottom: "1px solid #1c212c" }}>{children}</td>
+    <span className={`badge ${cls}`}>
+      {icon} {band} {score.toFixed(2)}
+    </span>
   );
 }
 
-function Badge({ band, children }: { band: "low" | "medium" | "high"; children: React.ReactNode }) {
-  const color = band === "high" ? "#ff6b6b" : band === "medium" ? "#ffd166" : "#4dd39a";
+function DecisionBadge({ decision }: { decision: AgentDecision["decision"] }) {
+  const map: Record<AgentDecision["decision"], { cls: string; icon: React.ReactNode }> = {
+    "act-now": { cls: "critical", icon: <Zap size={13} /> },
+    schedule: { cls: "warning", icon: <Calendar size={13} /> },
+    monitor: { cls: "neutral", icon: <Eye size={13} /> },
+    dismiss: { cls: "neutral", icon: <XCircle size={13} /> },
+  };
+  const { cls, icon } = map[decision];
   return (
-    <span style={{ color, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{children}</span>
+    <span className={`badge ${cls}`}>
+      {icon} {decision}
+    </span>
   );
+}
+
+function ActionChip({ kind }: { kind: string }) {
+  const icon =
+    kind === "chase-email" ? (
+      <Mail size={13} />
+    ) : kind === "create-quote" || kind === "convert-recurring" ? (
+      <TrendUp size={13} />
+    ) : kind === "pay-bill-early" || kind === "defer-bill" ? (
+      <Banknote size={13} />
+    ) : (
+      <Eye size={13} />
+    );
+  return (
+    <span className="chip">
+      {icon} {kind}
+    </span>
+  );
+}
+
+// ---- utils ----
+
+/**
+ * Pick up to `limit` signals, guaranteeing each distinct type appears before any
+ * type repeats — so one noisy detector can't crowd the others out of the card.
+ */
+function diversify(items: Signal[], limit: number): Signal[] {
+  const seen = new Set<string>();
+  const firstOfType: Signal[] = [];
+  const rest: Signal[] = [];
+  for (const s of items) {
+    if (seen.has(s.type)) rest.push(s);
+    else {
+      seen.add(s.type);
+      firstOfType.push(s);
+    }
+  }
+  return [...firstOfType, ...rest].slice(0, limit);
+}
+
+function gbp(n: number): string {
+  return n.toLocaleString("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
+}
+
+function trim(s: string, n: number): string {
+  return s.length > n ? `${s.slice(0, n)}…` : s;
 }

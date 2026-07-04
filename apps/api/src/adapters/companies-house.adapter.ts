@@ -42,8 +42,12 @@ export class CompaniesHouseAdapter implements CompanyIntelPort {
   async lookupCompany(companyName: string): Promise<CompaniesHouseData | null> {
     const search = await this.get<{
       items?: { company_number: string; title: string }[];
-    }>(`/search/companies?q=${encodeURIComponent(companyName)}&items_per_page=1`);
-    const hit = search?.items?.[0];
+    }>(`/search/companies?q=${encodeURIComponent(companyName)}&items_per_page=5`);
+    // Only accept a hit whose registered name actually matches ours. Search is
+    // fuzzy ("Reliable Rita Ltd" happily returns "AEER RITA CARE LTD"), and a
+    // wrong match could pin another company's distress flags on a customer —
+    // no data is strictly safer than wrong data.
+    const hit = (search?.items ?? []).find((i) => namesMatch(companyName, i.title));
     if (!hit) return null;
 
     const num = hit.company_number;
@@ -62,14 +66,54 @@ export class CompaniesHouseAdapter implements CompanyIntelPort {
       filings: (filingHistory?.items ?? []).map((f) => ({
         date: f.date,
         type: f.type,
-        description: f.description,
-        // The document API serves the filing PDF at document_metadata + /content.
-        pdfUrl: f.links?.document_metadata ? `${f.links.document_metadata}/content` : undefined,
+        description: humaniseFiling(f),
+        // Human-clickable filing PDF: the public site's document route (302s to a
+        // signed PDF). The API's document_metadata link needs auth, so a browser
+        // click on it would 404 — verified live.
+        pdfUrl: f.transaction_id
+          ? `${PUBLIC_BASE}/company/${num}/filing-history/${f.transaction_id}/document?format=pdf&download=0`
+          : undefined,
       })),
-      profileUrl: `https://find-and-update.company-information.service.gov.uk/company/${num}`,
+      profileUrl: `${PUBLIC_BASE}/company/${num}`,
       lastChecked: new Date().toISOString().slice(0, 10),
     };
   }
+}
+
+const PUBLIC_BASE = "https://find-and-update.company-information.service.gov.uk";
+
+/**
+ * Registered-name equality, tolerant of legal-suffix and punctuation variants:
+ * "Dana Retail Ltd" === "DANA RETAIL LIMITED" — but "Reliable Rita Ltd" !==
+ * "AEER RITA CARE LTD".
+ */
+export function namesMatch(a: string, b: string): boolean {
+  return normaliseCompanyName(a) === normaliseCompanyName(b);
+}
+
+function normaliseCompanyName(name: string): string {
+  return name
+    .toUpperCase()
+    .replace(/[.,'()&]/g, " ")
+    .replace(/\bLIMITED\b/g, "LTD")
+    .replace(/\bPUBLIC LIMITED COMPANY\b/g, "PLC")
+    .replace(/\bLIMITED LIABILITY PARTNERSHIP\b/g, "LLP")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Filing descriptions arrive as enum slugs ("appoint-person-director-company-
+ * with-name-date") plus description_values. Render something readable.
+ */
+function humaniseFiling(f: {
+  description: string;
+  description_values?: Record<string, string>;
+}): string {
+  const words = f.description.replace(/-/g, " ").replace(/\bwith name date\b/, "").trim();
+  const values = Object.values(f.description_values ?? {}).join(", ");
+  const text = words.charAt(0).toUpperCase() + words.slice(1);
+  return values ? `${text} — ${values}` : text;
 }
 
 interface ChProfile {
@@ -84,6 +128,8 @@ interface ChFilingHistory {
     date: string;
     type: string;
     description: string;
+    description_values?: Record<string, string>;
+    transaction_id?: string;
     links?: { document_metadata?: string };
   }[];
 }
@@ -142,6 +188,16 @@ export class CompaniesHouseStream {
           headers: { Authorization: `Basic ${Buffer.from(`${this.apiKey}:`).toString("base64")}` },
           signal: this.abort.signal,
         });
+        if (res.status === 401 || res.status === 403) {
+          // Auth failures don't heal with retries — CH streaming needs its own
+          // key (distinct from the REST key). Stop cleanly.
+          this.log(
+            `[ch-stream] key rejected (${res.status}) — streaming disabled. ` +
+              "Create a 'Stream' type key in the CH developer hub and set COMPANIES_HOUSE_STREAM_KEY.",
+          );
+          this.stopped = true;
+          return;
+        }
         if (!res.ok || !res.body) throw new Error(`stream connect → ${res.status}`);
         this.log("[ch-stream] connected");
         backoffMs = 1_000;
