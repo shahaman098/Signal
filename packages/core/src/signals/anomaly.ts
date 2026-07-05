@@ -1,5 +1,29 @@
 import { daysBetween, groupBy, round, sortByDateAsc } from "../analysis/util.js";
+import type { Invoice } from "../domain/types.js";
 import type { Signal, SignalInputs } from "./types.js";
+
+/**
+ * Token-set Jaccard similarity over the line-item descriptions of two
+ * invoices. 1 = identical wording, 0 = nothing in common. Invoices without
+ * descriptions compare as similar (no evidence either way).
+ */
+export function descriptionSimilarity(a: Invoice, b: Invoice): number {
+  const tokens = (inv: Invoice) =>
+    new Set(
+      inv.lineItems
+        .map((li) => li.description.toLowerCase())
+        .join(" ")
+        .split(/[^a-z0-9]+/)
+        .filter((t) => t.length > 2),
+    );
+  const ta = tokens(a);
+  const tb = tokens(b);
+  if (ta.size === 0 && tb.size === 0) return 1;
+  if (ta.size === 0 || tb.size === 0) return 0;
+  let inter = 0;
+  for (const t of ta) if (tb.has(t)) inter += 1;
+  return inter / (ta.size + tb.size - inter);
+}
 
 /**
  * Anomaly / hygiene.
@@ -20,7 +44,9 @@ export function anomalySignals(inputs: SignalInputs): Signal[] {
     const name = contactName.get(contactId) ?? contactId;
     const ordered = sortByDateAsc(invoices, (i) => i.issueDate);
 
-    // 17 — Duplicates: same total (±0.5%), issue dates within 7 days.
+    // 17 — Duplicates: same total (±0.5%), issued within 7 days, AND similar
+    // line-item descriptions (token Jaccard ≥ 0.5) — two different services
+    // that happen to cost the same are not a duplicate.
     for (let i = 0; i < ordered.length; i++) {
       for (let j = i + 1; j < ordered.length; j++) {
         const a = ordered[i]!;
@@ -29,12 +55,14 @@ export function anomalySignals(inputs: SignalInputs): Signal[] {
         if (gap > 7) continue;
         const near = Math.abs(a.total - b.total) <= Math.max(a.total, b.total) * 0.005;
         if (!near || a.total === 0) continue;
+        if (descriptionSimilarity(a, b) < 0.5) continue;
         signals.push({
           id: `duplicate-invoice:${a.invoiceId}:${b.invoiceId}`,
           category: "anomaly",
           type: "duplicate-invoice",
           severity: "high",
           score: 0.9,
+          impact: a.total,
           title: `Possible duplicate: ${a.invoiceNumber ?? a.invoiceId} & ${b.invoiceNumber ?? b.invoiceId} (${name}, both ${a.total})`,
           contactId,
           invoiceId: b.invoiceId,
@@ -64,6 +92,7 @@ export function anomalySignals(inputs: SignalInputs): Signal[] {
           type: "amount-anomaly",
           severity: latest.status === "DRAFT" ? "medium" : "high",
           score: round(Math.min(1, Math.abs(Math.log10(ratio || 1))), 3),
+          impact: round(Math.abs(latest.total - median)),
           title: `${latest.invoiceNumber ?? latest.invoiceId} is ${ratio}× ${name}'s typical amount — verify`,
           contactId,
           invoiceId: latest.invoiceId,
@@ -98,6 +127,7 @@ export function anomalySignals(inputs: SignalInputs): Signal[] {
           type: "terms-change",
           severity: "medium",
           score: round(Math.min(1, Math.abs(latestTerms - modal) / 60), 3),
+          impact: ordered.at(-1)!.total,
           title: `${name}: payment terms jumped ${modal}d → ${latestTerms}d on ${latest.invoiceNumber ?? latest.invoiceId}`,
           contactId,
           invoiceId: latest.invoiceId,

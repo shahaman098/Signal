@@ -1,0 +1,158 @@
+{
+  "id": "churn-cohort-match:contact-chronic",
+  "signalId": "churn-cohort-match:contact-chronic",
+  "status": "proposed",
+  "createdAt": "2026-07-04T19:40:54.666Z",
+  "updatedAt": "2026-07-04T19:43:52.717Z",
+  "snapshotAsOf": "2026-07-04",
+  "signalFingerprint": "azt73h",
+  "title": "Chronic Chris Co is behaving like customers ~2 months before they churned",
+  "category": "strategic",
+  "severity": "high",
+  "contactId": "contact-chronic",
+  "contactName": "Chronic Chris Co",
+  "action": {
+    "kind": "create-quote",
+    "contactId": "contact-chronic",
+    "rationale": "Pre-emptive retention offer — churn-cohort trajectory match"
+  },
+  "prepared": {
+    "contactId": "contact-chronic",
+    "reference": "Pre-emptive retention offer — churn-cohort trajectory match",
+    "summary": "Pre-emptive retention offer — churn-cohort trajectory match",
+    "lineItems": [
+      {
+        "description": "Monthly service",
+        "quantity": 1,
+        "unitAmount": 1500,
+        "lineAmount": 1500,
+        "accountCode": "200",
+        "itemCode": "SVC-C"
+      }
+    ]
+  },
+  "reasoning": {
+    "decision": "act-now",
+    "decisionReasoning": "Current order gap is 1.71× their normal cadence; churned customers averaged 1.45× just before going quiet. Payment behaviour is also worsening — same pattern the churn cohort showed. Intervene now: check in, offer an incentive, fix any service issue. Policy: high strategic → act-now.",
+    "decidedBy": "rules",
+    "priority": 4,
+    "signalReasoning": [
+      "Current order gap is 1.71× their normal cadence; churned customers averaged 1.45× just before going quiet",
+      "Payment behaviour is also worsening — same pattern the churn cohort showed",
+      "Intervene now: check in, offer an incentive, fix any service issue"
+    ],
+    "evidence": [
+      {
+        "label": "Cohort of 1 churned customer(s)"
+      }
+    ]
+  },
+  "inputs": {
+    "series": [
+      {
+        "id": "payment-lateness",
+        "title": "Days late per settled invoice",
+        "unit": "days",
+        "kind": "bar",
+        "baseline": 0,
+        "points": [
+          {
+            "date": "2026-02-04",
+            "value": 10,
+            "label": "INV-1007"
+          },
+          {
+            "date": "2026-03-10",
+            "value": 14,
+            "label": "INV-1008"
+          },
+          {
+            "date": "2026-04-17",
+            "value": 22,
+            "label": "INV-1009"
+          },
+          {
+            "date": "2026-05-28",
+            "value": 33,
+            "label": "INV-1010"
+          },
+          {
+            "date": "2026-07-02",
+            "value": 38,
+            "label": "INV-1011"
+          }
+        ]
+      },
+      {
+        "id": "order-values",
+        "title": "Order value per invoice",
+        "unit": "currency",
+        "kind": "line",
+        "points": [
+          {
+            "date": "2026-01-05",
+            "value": 3000,
+            "label": "INV-1007"
+          },
+          {
+            "date": "2026-02-04",
+            "value": 3000,
+            "label": "INV-1008"
+          },
+          {
+            "date": "2026-03-06",
+            "value": 3000,
+            "label": "INV-1009"
+          },
+          {
+            "date": "2026-04-05",
+            "value": 3000,
+            "label": "INV-1010"
+          },
+          {
+            "date": "2026-04-25",
+            "value": 3500,
+            "label": "INV-1012"
+          },
+          {
+            "date": "2026-05-05",
+            "value": 3000,
+            "label": "INV-1011"
+          },
+          {
+            "date": "2026-05-25",
+            "value": 1500,
+            "label": "INV-1013"
+          }
+        ]
+      }
+    ],
+    "metrics": [
+      {
+        "label": "Avg days late",
+        "value": "23.4d (worsening)",
+        "tone": "bad"
+      },
+      {
+        "label": "Order cadence",
+        "value": "every ~23d · repeat",
+        "tone": "good"
+      },
+      {
+        "label": "Last order",
+        "value": "40d ago",
+        "tone": "neutral"
+      },
+      {
+        "label": "Churn score",
+        "value": "0.28",
+        "tone": "good"
+      },
+      {
+        "label": "Overdue balance",
+        "value": "5000",
+        "tone": "bad"
+      }
+    ]
+  }
+}

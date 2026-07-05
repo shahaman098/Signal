@@ -59,6 +59,7 @@ export function cashflowTimingSignals(inputs: SignalInputs): Signal[] {
       type: "bills-vs-receivables",
       severity: short ? "high" : "info",
       score: short ? round(Math.min(1, gap / Math.max(totalOut, 1)), 3) : 0.1,
+      impact: short ? gap : undefined,
       title: short
         ? `Next ${HORIZON_DAYS}d: ${totalOut} out vs ~${expectedIn} in — ${gap} short; defer ${defer.map((b) => b.billId).join(", ")}`
         : `Next ${HORIZON_DAYS}d: cash-positive (${expectedIn} in vs ${totalOut} out)`,
@@ -90,6 +91,7 @@ export function cashflowTimingSignals(inputs: SignalInputs): Signal[] {
       type: "early-payment-discount",
       severity: cashAllows ? "medium" : "info",
       score: round(Math.min(1, saving / 500), 3),
+      impact: saving,
       title: `Pay ${bill.billId} by ${epd.ifPaidBy} to save ${saving} (${epd.percent}%)`,
       billId: bill.billId,
       reasoning: [
@@ -123,10 +125,11 @@ export function cashflowTimingSignals(inputs: SignalInputs): Signal[] {
       type: "supplier-distress",
       severity: share > 0.4 ? "high" : "medium",
       score: round(share, 3),
+      impact: round(spend),
       title: `Supplier ${supplier.name} shows distress flags — ${round(share * 100)}% of spend depends on them`,
       contactId: supplier.contactId,
       reasoning: [
-        `Companies House flags: ${ctx!.companiesHouse!.flags.join(", ")}`,
+        `Companies House flags: ${(ctx!.companiesHouse!.flags ?? []).join(", ")}`,
         `${round(share * 100)}% of bill spend goes to ${supplier.name}`,
         "Line up an alternate supplier; be cautious with prepayments",
       ],
@@ -134,7 +137,7 @@ export function cashflowTimingSignals(inputs: SignalInputs): Signal[] {
         ...(ctx?.companiesHouse?.profileUrl
           ? [{ label: "Companies House profile", url: ctx.companiesHouse.profileUrl }]
           : []),
-        ...(ctx?.companiesHouse?.filings.slice(0, 2).map((f) => ({
+        ...(ctx?.companiesHouse?.filings?.slice(0, 2).map((f) => ({
           label: `${f.date} ${f.description}`,
           url: f.pdfUrl,
         })) ?? []),

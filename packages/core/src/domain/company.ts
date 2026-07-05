@@ -20,7 +20,8 @@ export type CompaniesHouseFlag =
   | "receivership"
   | "dormant-filing"
   | "recent-officer-exodus"
-  | "charge-registered"; // new security granted over assets
+  | "charge-registered" // new security granted over assets
+  | "insolvency-history";
 
 export interface CompaniesHouseFiling {
   date: ISODate;
@@ -40,6 +41,32 @@ export interface CompaniesHouseData {
   /** Public profile page on find-and-update.company-information.service.gov.uk */
   profileUrl?: string;
   lastChecked: ISODate;
+  /** Directors: how many active, how many resigned in the last 12 months. */
+  officers?: { activeCount: number; resignedLast12m: number };
+  /** Outstanding registered charges (security over assets). */
+  chargesOutstanding?: number;
+  /** Insolvency cases on record. */
+  insolvencyCases?: number;
+  /** Next accounts filing due — early warning before "overdue". */
+  accountsNextDue?: ISODate;
+}
+
+/** How confident we are that the CH record belongs to this contact. */
+export type MatchConfidence = "exact" | "probable" | "confirmed" | "none";
+
+/** A search hit the human can confirm when no automatic match was safe. */
+export interface CompanyCandidate {
+  companyNumber: string;
+  title: string;
+  status?: string;
+}
+
+/** An official public-record notice from The Gazette (insolvency etc.). */
+export interface GazetteNotice {
+  date: ISODate;
+  title: string;
+  url: string;
+  category?: string;
 }
 
 export type NewsSentiment = "positive" | "negative" | "neutral";
@@ -59,8 +86,14 @@ export interface CompanyContext {
   companyName: string;
   role: CompanyRole;
   companyNumber?: string;
+  /** How the CH record was matched; "confirmed" = human-pinned, never re-searched. */
+  matchConfidence?: MatchConfidence;
+  /** Top search hits when no automatic match was safe — for human confirmation. */
+  chCandidates?: CompanyCandidate[];
   companiesHouse?: CompaniesHouseData;
   news: NewsItem[];
+  /** Official public-record notices (The Gazette). */
+  gazetteNotices?: GazetteNotice[];
   updatedAt: ISODate;
 }
 
@@ -76,11 +109,11 @@ export const DISTRESS_FLAGS: readonly CompaniesHouseFlag[] = [
 
 export function isDistressed(ctx: CompanyContext | undefined): boolean {
   if (!ctx?.companiesHouse) return false;
-  return ctx.companiesHouse.flags.some((f) => DISTRESS_FLAGS.includes(f));
+  return (ctx.companiesHouse.flags ?? []).some((f) => DISTRESS_FLAGS.includes(f));
 }
 
 export function recentPositiveNews(ctx: CompanyContext | undefined, asOf: ISODate, windowDays = 60): NewsItem[] {
   if (!ctx) return [];
   const cutoff = new Date(asOf).getTime() - windowDays * 24 * 60 * 60 * 1000;
-  return ctx.news.filter((n) => n.sentiment === "positive" && new Date(n.date).getTime() >= cutoff);
+  return (ctx.news ?? []).filter((n) => n.sentiment === "positive" && new Date(n.date).getTime() >= cutoff);
 }

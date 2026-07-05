@@ -50,17 +50,21 @@ export class FakeXeroAdapter implements XeroPort {
     return this.snapshotData;
   }
 
-  async createQuote(input: CreateQuoteInput): Promise<{ quoteId: string }> {
+  async createQuote(input: CreateQuoteInput): Promise<{ quoteId: string; deepLink?: string }> {
     this.created.quotes.push(input);
-    return { quoteId: `quote-${++this.counter}` };
+    const quoteId = `quote-${++this.counter}`;
+    return { quoteId, deepLink: `https://go.xero.com/app/quotes/${quoteId}` };
   }
 
-  async createInvoiceDraft(input: CreateInvoiceDraftInput): Promise<{ invoiceId: string }> {
+  async createInvoiceDraft(
+    input: CreateInvoiceDraftInput,
+  ): Promise<{ invoiceId: string; deepLink?: string }> {
     this.created.invoiceDrafts.push(input);
-    return { invoiceId: `draft-${++this.counter}` };
+    const invoiceId = `draft-${++this.counter}`;
+    return { invoiceId, deepLink: `https://go.xero.com/app/invoices/${invoiceId}` };
   }
 
-  async createPayment(input: CreatePaymentInput): Promise<{ paymentId: string }> {
+  async createPayment(input: CreatePaymentInput): Promise<{ paymentId: string; deepLink?: string }> {
     this.created.payments.push(input);
     return { paymentId: `payment-${++this.counter}` };
   }

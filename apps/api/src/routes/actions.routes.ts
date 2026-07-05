@@ -45,7 +45,7 @@ export function actionsRoutes(actions: ActionsService): Router {
     }
   });
 
-  // Chase email — drafted by Claude, returned to the caller (not written to Xero).
+  // Chase email — drafted by the LLM (Gemini), returned to the caller (not written to Xero).
   const chaseSchema = z.object({ tone: z.enum(["friendly", "firm"]).optional() });
   router.post("/invoices/:invoiceId/chase-email", async (req, res, next) => {
     try {

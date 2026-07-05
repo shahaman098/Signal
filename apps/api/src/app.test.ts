@@ -6,22 +6,29 @@ import { beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { createApp } from "./app.js";
 import { FakeXeroAdapter } from "./adapters/fake-xero.adapter.js";
-import { FakeCompanyIntelAdapter, FakeNewsAdapter } from "./adapters/fake-intel.adapter.js";
-import { ChaseEmailDrafter } from "./llm/chase-email.js";
+import {
+  FakeCompanyIntelAdapter,
+  FakeGazetteAdapter,
+  FakeNewsAdapter,
+} from "./adapters/fake-intel.adapter.js";
+import { GeminiClient } from "./llm/gemini.js";
 
 function makeApp() {
   const xero = new FakeXeroAdapter();
   const contextDir = mkdtempSync(join(tmpdir(), "signal-ctx-"));
+  const proposalsDir = mkdtempSync(join(tmpdir(), "signal-props-"));
   const { app, services } = createApp({
     xero,
     intel: new FakeCompanyIntelAdapter(),
     news: new FakeNewsAdapter(),
+    gazette: new FakeGazetteAdapter(),
     // No API key → chase emails + agent decisions use offline fallbacks.
-    emailDrafter: new ChaseEmailDrafter("", "claude-opus-4-8"),
+    llm: new GeminiClient("", "gemini-3.5-flash"),
     contextDir,
+    proposalsDir,
     cacheTtlMs: 0,
   });
-  return { app, xero, services, contextDir };
+  return { app, xero, services, contextDir, proposalsDir };
 }
 
 describe("API — reads & analysis", () => {
@@ -118,6 +125,111 @@ describe("API — signals & company intelligence", () => {
   });
 });
 
+describe("API — sources & company briefs", () => {
+  it("GET /api/sources returns the unified evidence feed, newest first", async () => {
+    const { app } = makeApp();
+    const res = await request(app).get("/api/sources");
+    expect(res.status).toBe(200);
+    const items = res.body as { type: string; date: string; companyName: string; url?: string }[];
+    expect(items.length).toBeGreaterThan(3);
+    // Contains all three evidence types from the fake intel
+    const types = new Set(items.map((i) => i.type));
+    expect(types.has("news")).toBe(true);
+    expect(types.has("gazette")).toBe(true);
+    expect(types.has("filing")).toBe(true);
+    // Sorted newest-first
+    for (let i = 1; i < items.length; i++) {
+      expect(items[i - 1]!.date >= items[i]!.date).toBe(true);
+    }
+  });
+
+  it("GET /api/companies/:id/brief composes the dossier from real data", async () => {
+    const { app } = makeApp();
+    const res = await request(app).get("/api/companies/contact-distress/brief");
+    expect(res.status).toBe(200);
+    const b = res.body;
+    expect(b.briefBy).toBe("rules"); // offline
+    expect(b.brief).toMatch(/Dana Retail/);
+    expect(b.brief).toMatch(/accounts-overdue/); // flags surfaced
+    expect(b.brief).toMatch(/Gazette notice/);
+    expect(b.metrics.length).toBeGreaterThan(0);
+    expect(b.signals.some((s: { type: string }) => s.type === "distress-collection")).toBe(true);
+    expect(b.evidence.some((e: { type: string }) => e.type === "gazette")).toBe(true);
+  });
+
+  it("brief 404s for unknown companies", async () => {
+    const { app } = makeApp();
+    const res = await request(app).get("/api/companies/nope/brief");
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("API — measure & interrogate", () => {
+  it("GET /api/impact starts at zero and counts executed actions", async () => {
+    const { app } = makeApp();
+    const before = await request(app).get("/api/impact");
+    expect(before.status).toBe(200);
+    expect(before.body.totalUnlocked).toBe(0);
+
+    // Generate (auto-executes chase drafts) then approve a quote proposal.
+    await request(app).post("/api/proposals/generate");
+    const proposals = (await request(app).get("/api/proposals")).body as {
+      id: string;
+      status: string;
+      prepared?: { lineItems: { lineAmount: number }[] };
+    }[];
+    const quote = proposals.find((p) => p.status === "proposed" && p.prepared)!;
+    await request(app).post(`/api/proposals/${encodeURIComponent(quote.id)}/approve`);
+
+    const after = await request(app).get("/api/impact");
+    expect(after.body.actionsExecuted).toBeGreaterThan(0);
+    expect(after.body.emailsDrafted).toBeGreaterThan(0);
+    expect(after.body.quotesCreated).toBe(1);
+    const quoteValue = quote.prepared!.lineItems.reduce((s, li) => s + li.lineAmount, 0);
+    expect(after.body.pipelineCreated).toBe(quoteValue);
+    expect(after.body.totalUnlocked).toBeGreaterThanOrEqual(quoteValue);
+  });
+
+  it("counts REAL cash recovery when a chased invoice's balance drops in Xero", async () => {
+    const { app, xero } = makeApp();
+    await request(app).post("/api/proposals/generate");
+
+    // Find an auto-executed chase and pay its invoice down in the (fake) ledger.
+    const proposals = (await request(app).get("/api/proposals")).body as {
+      status: string;
+      invoiceId?: string;
+      action: { kind: string };
+      result?: { amountDueAtExecution?: number };
+    }[];
+    const chase = proposals.find((p) => p.action.kind === "chase-email" && p.status === "executed")!;
+    expect(chase.result?.amountDueAtExecution).toBeGreaterThan(0);
+
+    const snapshot = await xero.snapshot();
+    const invoice = snapshot.invoices.find((i) => i.invoiceId === chase.invoiceId)!;
+    const paid = invoice.amountDue;
+    invoice.amountPaid += paid;
+    invoice.amountDue = 0; // customer paid after the chase
+
+    const impact = await request(app).get("/api/impact");
+    expect(impact.body.cashRecovered).toBe(paid);
+  });
+
+  it("POST /api/ask answers grounded questions offline with real numbers", async () => {
+    const { app } = makeApp();
+    const res = await request(app).post("/api/ask").send({ question: "How much is overdue right now?" });
+    expect(res.status).toBe(200);
+    expect(res.body.answeredBy).toBe("offline");
+    expect(res.body.answer).toMatch(/overdue/i);
+    expect(res.body.answer).toMatch(/\d/); // contains actual figures
+  });
+
+  it("POST /api/ask validates input", async () => {
+    const { app } = makeApp();
+    const res = await request(app).post("/api/ask").send({});
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("API — agent decisions", () => {
   it("POST /api/agent/decide returns prioritised decisions with reasoning", async () => {
     const { app } = makeApp();
@@ -150,6 +262,7 @@ describe("API — writes & actions", () => {
       });
     expect(res.status).toBe(201);
     expect(res.body.quoteId).toBeTruthy();
+    expect(res.body.deepLink).toMatch(/^https:\/\/go\.xero\.com\//);
     expect(xero.created.quotes).toHaveLength(1);
   });
 

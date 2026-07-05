@@ -1,0 +1,140 @@
+{
+  "id": "shrinking-basket-winback:contact-shrinking",
+  "signalId": "shrinking-basket-winback:contact-shrinking",
+  "status": "proposed",
+  "createdAt": "2026-07-04T19:40:54.666Z",
+  "updatedAt": "2026-07-04T19:43:52.717Z",
+  "snapshotAsOf": "2026-07-04",
+  "signalFingerprint": "m5uz40",
+  "title": "Shrinkage Bros: basket shrinking 1000 → 700 → 450 — win back before they lapse",
+  "category": "revenue-growth",
+  "severity": "high",
+  "contactId": "contact-shrinking",
+  "contactName": "Shrinkage Bros",
+  "action": {
+    "kind": "create-quote",
+    "contactId": "contact-shrinking",
+    "rationale": "Early win-back offer for shrinking basket"
+  },
+  "prepared": {
+    "contactId": "contact-shrinking",
+    "reference": "Early win-back offer for shrinking basket",
+    "summary": "Early win-back offer for shrinking basket",
+    "lineItems": [
+      {
+        "description": "Service A",
+        "quantity": 1,
+        "unitAmount": 315,
+        "lineAmount": 315,
+        "accountCode": "200",
+        "itemCode": "SVC-A"
+      },
+      {
+        "description": "Service B",
+        "quantity": 1,
+        "unitAmount": 135,
+        "lineAmount": 135,
+        "accountCode": "200",
+        "itemCode": "SVC-B"
+      }
+    ]
+  },
+  "reasoning": {
+    "decision": "act-now",
+    "decisionReasoning": "Order value declined 55% over the last three cycles. Still ordering — early intervention beats a reactivation later. Policy: high revenue-growth → act-now.",
+    "decidedBy": "rules",
+    "priority": 8,
+    "signalReasoning": [
+      "Order value declined 55% over the last three cycles",
+      "Still ordering — early intervention beats a reactivation later"
+    ],
+    "evidence": [
+      {
+        "label": "Last 3 orders: 1000, 700, 450"
+      }
+    ]
+  },
+  "inputs": {
+    "series": [
+      {
+        "id": "payment-lateness",
+        "title": "Days late per settled invoice",
+        "unit": "days",
+        "kind": "bar",
+        "baseline": 0,
+        "points": [
+          {
+            "date": "2026-04-05",
+            "value": 0,
+            "label": "INV-2015"
+          },
+          {
+            "date": "2026-05-05",
+            "value": 0,
+            "label": "INV-2016"
+          },
+          {
+            "date": "2026-06-04",
+            "value": 0,
+            "label": "INV-2017"
+          },
+          {
+            "date": "2026-07-04",
+            "value": 0,
+            "label": "INV-2018"
+          }
+        ]
+      },
+      {
+        "id": "order-values",
+        "title": "Order value per invoice",
+        "unit": "currency",
+        "kind": "line",
+        "points": [
+          {
+            "date": "2026-03-16",
+            "value": 1200,
+            "label": "INV-2015"
+          },
+          {
+            "date": "2026-04-15",
+            "value": 1000,
+            "label": "INV-2016"
+          },
+          {
+            "date": "2026-05-15",
+            "value": 700,
+            "label": "INV-2017"
+          },
+          {
+            "date": "2026-06-14",
+            "value": 450,
+            "label": "INV-2018"
+          }
+        ]
+      }
+    ],
+    "metrics": [
+      {
+        "label": "Avg days late",
+        "value": "0d (stable)",
+        "tone": "good"
+      },
+      {
+        "label": "Order cadence",
+        "value": "every ~30d · repeat",
+        "tone": "good"
+      },
+      {
+        "label": "Last order",
+        "value": "20d ago",
+        "tone": "neutral"
+      },
+      {
+        "label": "Churn score",
+        "value": "0.11",
+        "tone": "good"
+      }
+    ]
+  }
+}

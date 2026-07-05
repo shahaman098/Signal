@@ -2,19 +2,20 @@ import {
   runSignalEngine,
   type CompanyContext,
   type SignalRunResult,
-  type XeroPort,
 } from "@signal/core";
+import type { AnalyticsService } from "./analytics.service.js";
 import type { ContextStore } from "./context-store.js";
 import type { IngestionService } from "./ingestion.service.js";
 
 /**
  * Combines the Xero snapshot with the persisted company contexts and runs the
- * signal engine. If the context store is empty (first boot), it triggers one
- * ingestion pass so signals always have company intelligence to work with.
+ * signal engine. Snapshots come through AnalyticsService's cache — against a
+ * real org a snapshot is many paginated MCP calls, and a single dashboard load
+ * hits several endpoints; without the shared cache each one would re-sweep Xero.
  */
 export class SignalsService {
   constructor(
-    private readonly xero: XeroPort,
+    private readonly analytics: AnalyticsService,
     private readonly store: ContextStore,
     private readonly ingestion: IngestionService,
   ) {}
@@ -30,7 +31,7 @@ export class SignalsService {
 
   async run(): Promise<SignalRunResult> {
     const [snapshot, companyContexts] = await Promise.all([
-      this.xero.snapshot(),
+      this.analytics.getSnapshot(),
       this.getContexts(),
     ]);
     return runSignalEngine({ ...snapshot, companyContexts });

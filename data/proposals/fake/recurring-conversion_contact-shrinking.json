@@ -1,0 +1,140 @@
+{
+  "id": "recurring-conversion:contact-shrinking",
+  "signalId": "recurring-conversion:contact-shrinking",
+  "status": "proposed",
+  "createdAt": "2026-07-04T19:40:54.666Z",
+  "updatedAt": "2026-07-04T19:43:52.717Z",
+  "snapshotAsOf": "2026-07-04",
+  "signalFingerprint": "1fgbdl3",
+  "title": "Shrinkage Bros buys SVC-A every ~30d — convert to recurring",
+  "category": "revenue-growth",
+  "severity": "medium",
+  "contactId": "contact-shrinking",
+  "contactName": "Shrinkage Bros",
+  "action": {
+    "kind": "convert-recurring",
+    "contactId": "contact-shrinking",
+    "itemCode": "SVC-A"
+  },
+  "prepared": {
+    "contactId": "contact-shrinking",
+    "reference": "Convert to recurring order",
+    "summary": "Convert to recurring order",
+    "lineItems": [
+      {
+        "description": "Service A",
+        "quantity": 1,
+        "unitAmount": 315,
+        "lineAmount": 315,
+        "accountCode": "200",
+        "itemCode": "SVC-A"
+      },
+      {
+        "description": "Service B",
+        "quantity": 1,
+        "unitAmount": 135,
+        "lineAmount": 135,
+        "accountCode": "200",
+        "itemCode": "SVC-B"
+      }
+    ]
+  },
+  "reasoning": {
+    "decision": "schedule",
+    "decisionReasoning": "4 orders of SVC-A at a ~30-day cadence. A recurring quote/invoice locks in the revenue and saves both sides admin. Policy: medium revenue-growth → schedule.",
+    "decidedBy": "rules",
+    "priority": 18,
+    "signalReasoning": [
+      "4 orders of SVC-A at a ~30-day cadence",
+      "A recurring quote/invoice locks in the revenue and saves both sides admin"
+    ],
+    "evidence": [
+      {
+        "label": "4 orders, last 2026-06-14"
+      }
+    ]
+  },
+  "inputs": {
+    "series": [
+      {
+        "id": "payment-lateness",
+        "title": "Days late per settled invoice",
+        "unit": "days",
+        "kind": "bar",
+        "baseline": 0,
+        "points": [
+          {
+            "date": "2026-04-05",
+            "value": 0,
+            "label": "INV-2015"
+          },
+          {
+            "date": "2026-05-05",
+            "value": 0,
+            "label": "INV-2016"
+          },
+          {
+            "date": "2026-06-04",
+            "value": 0,
+            "label": "INV-2017"
+          },
+          {
+            "date": "2026-07-04",
+            "value": 0,
+            "label": "INV-2018"
+          }
+        ]
+      },
+      {
+        "id": "order-values",
+        "title": "Order value per invoice",
+        "unit": "currency",
+        "kind": "line",
+        "points": [
+          {
+            "date": "2026-03-16",
+            "value": 1200,
+            "label": "INV-2015"
+          },
+          {
+            "date": "2026-04-15",
+            "value": 1000,
+            "label": "INV-2016"
+          },
+          {
+            "date": "2026-05-15",
+            "value": 700,
+            "label": "INV-2017"
+          },
+          {
+            "date": "2026-06-14",
+            "value": 450,
+            "label": "INV-2018"
+          }
+        ]
+      }
+    ],
+    "metrics": [
+      {
+        "label": "Avg days late",
+        "value": "0d (stable)",
+        "tone": "good"
+      },
+      {
+        "label": "Order cadence",
+        "value": "every ~30d · repeat",
+        "tone": "good"
+      },
+      {
+        "label": "Last order",
+        "value": "20d ago",
+        "tone": "neutral"
+      },
+      {
+        "label": "Churn score",
+        "value": "0.11",
+        "tone": "good"
+      }
+    ]
+  }
+}

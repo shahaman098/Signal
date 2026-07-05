@@ -1,5 +1,5 @@
 import { indexCadenceByContact } from "../analysis/order-cadence.js";
-import { groupBy, mean, round, sortByDateAsc } from "../analysis/util.js";
+import { groupBy, mean, median, round, sortByDateAsc } from "../analysis/util.js";
 import { recentPositiveNews } from "../domain/company.js";
 import type { Signal, SignalInputs } from "./types.js";
 
@@ -38,6 +38,10 @@ export function revenueGrowthSignals(inputs: SignalInputs): Signal[] {
     for (const li of inv.lineItems) if (li.itemCode) set.add(li.itemCode);
   }
 
+  // Typical order value per contact — the impact unit for growth plays.
+  const medianOrder = new Map<string, number>();
+  for (const [cid, invs] of byContact) medianOrder.set(cid, round(median(invs.map((i) => i.total))));
+
   for (const [contactId, invoices] of byContact) {
     const name = contactName.get(contactId) ?? contactId;
     const cad = cadence.get(contactId);
@@ -57,6 +61,7 @@ export function revenueGrowthSignals(inputs: SignalInputs): Signal[] {
           type: "recurring-conversion",
           severity: "medium",
           score: round(Math.min(1, count! / 8), 3),
+          impact: medianOrder.get(contactId),
           title: `${name} buys ${topItem} every ~${cad.frequencyDays}d — convert to recurring`,
           contactId,
           reasoning: [
@@ -79,6 +84,7 @@ export function revenueGrowthSignals(inputs: SignalInputs): Signal[] {
           type: "reactivation-offer",
           severity: "high",
           score: churnByContact.get(contactId)?.score ?? 0.7,
+          impact: medianOrder.get(contactId),
           title: `${name}: high-value customer gone quiet ${cad.recencyDays}d — send reactivation offer`,
           contactId,
           reasoning: [
@@ -109,6 +115,7 @@ export function revenueGrowthSignals(inputs: SignalInputs): Signal[] {
           type: "shrinking-basket-winback",
           severity: "high",
           score: round(drop, 3),
+          impact: round(last3[0]! - last3[2]!),
           title: `${name}: basket shrinking ${last3.join(" → ")} — win back before they lapse`,
           contactId,
           reasoning: [
@@ -135,6 +142,7 @@ export function revenueGrowthSignals(inputs: SignalInputs): Signal[] {
         type: "good-news-upsell",
         severity: "medium",
         score: 0.6,
+        impact: medianOrder.get(contactId),
         title: `${name} just had good news ("${top.title}") — timed upsell`,
         contactId,
         reasoning: [
@@ -152,7 +160,7 @@ export function revenueGrowthSignals(inputs: SignalInputs): Signal[] {
   }
 
   // 9 — Cross-sell: customer buys A; peers who buy A also buy B; customer lacks B.
-  signals.push(...crossSellSignals(itemsBought, contactName));
+  signals.push(...crossSellSignals(itemsBought, contactName, medianOrder));
 
   return signals;
 }
@@ -160,6 +168,7 @@ export function revenueGrowthSignals(inputs: SignalInputs): Signal[] {
 function crossSellSignals(
   itemsBought: Map<string, Set<string>>,
   contactName: Map<string, string>,
+  medianOrder: Map<string, number>,
 ): Signal[] {
   const signals: Signal[] = [];
   for (const [contactId, items] of itemsBought) {
@@ -182,6 +191,7 @@ function crossSellSignals(
           type: "cross-sell",
           severity: "info",
           score: round(n / peers.length, 3),
+          impact: medianOrder.get(contactId),
           title: `${name} fits the ${itemB}-buyer profile — cross-sell`,
           contactId,
           reasoning: [

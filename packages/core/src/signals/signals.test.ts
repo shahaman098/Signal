@@ -139,6 +139,28 @@ describe("signal engine — anomaly / hygiene", () => {
   });
 });
 
+describe("signal engine — impact", () => {
+  it("attaches money-at-stake to recovery and growth signals", () => {
+    const distress = one("distress-collection");
+    expect(distress.impact).toBe(1200); // Dana's open balance
+    const escalation = one("slip-risk-escalation", (s) => s.contactId === "contact-chronic");
+    expect(escalation.impact).toBe(3500);
+    const reactivation = one("reactivation-offer");
+    expect(reactivation.impact).toBeGreaterThan(0); // Lucy's median order
+    const discount = one("early-payment-discount");
+    expect(discount.impact).toBe(18); // 2% of 900
+    const drift = one("margin-drift");
+    expect(drift.impact).toBeGreaterThan(0); // monthly £ leak, not just %
+  });
+
+  it("ranks by impact within a severity band", () => {
+    const highs = result.signals.filter((s) => s.severity === "high");
+    for (let i = 1; i < highs.length; i++) {
+      expect((highs[i - 1]!.impact ?? 0) >= (highs[i]!.impact ?? 0)).toBe(true);
+    }
+  });
+});
+
 describe("signal engine — prioritisation", () => {
   it("covers all five categories", () => {
     expect(result.countsByCategory["cash-recovery"]).toBeGreaterThan(0);

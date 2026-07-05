@@ -1,0 +1,147 @@
+{
+  "id": "amount-anomaly:einv-27",
+  "signalId": "amount-anomaly:einv-27",
+  "status": "proposed",
+  "createdAt": "2026-07-04T19:40:54.666Z",
+  "updatedAt": "2026-07-04T19:43:52.717Z",
+  "snapshotAsOf": "2026-07-04",
+  "signalFingerprint": "a0lca4",
+  "title": "INV-2027 is 5.2× Reliable Rita Ltd's typical amount — verify",
+  "category": "anomaly",
+  "severity": "medium",
+  "contactId": "contact-reliable",
+  "contactName": "Reliable Rita Ltd",
+  "invoiceId": "einv-27",
+  "action": {
+    "kind": "flag-review",
+    "note": "Verify einv-27 amount (5200) against expected ~1000"
+  },
+  "reasoning": {
+    "decision": "schedule",
+    "decisionReasoning": "Invoice total 5200 vs historical median 1000. Still a draft — verify before sending. Policy: medium anomaly → schedule.",
+    "decidedBy": "rules",
+    "priority": 15,
+    "signalReasoning": [
+      "Invoice total 5200 vs historical median 1000",
+      "Still a draft — verify before sending"
+    ],
+    "evidence": [
+      {
+        "label": "History medians from 8 prior invoices"
+      }
+    ]
+  },
+  "inputs": {
+    "series": [
+      {
+        "id": "payment-lateness",
+        "title": "Days late per settled invoice",
+        "unit": "days",
+        "kind": "bar",
+        "baseline": 0,
+        "points": [
+          {
+            "date": "2026-01-23",
+            "value": -2,
+            "label": "INV-1001"
+          },
+          {
+            "date": "2026-02-22",
+            "value": -2,
+            "label": "INV-1002"
+          },
+          {
+            "date": "2026-03-24",
+            "value": -2,
+            "label": "INV-1003"
+          },
+          {
+            "date": "2026-04-23",
+            "value": -2,
+            "label": "INV-1004"
+          },
+          {
+            "date": "2026-05-23",
+            "value": -2,
+            "label": "INV-1005"
+          },
+          {
+            "date": "2026-06-22",
+            "value": -2,
+            "label": "INV-1006"
+          }
+        ]
+      },
+      {
+        "id": "order-values",
+        "title": "Order value per invoice",
+        "unit": "currency",
+        "kind": "line",
+        "points": [
+          {
+            "date": "2026-01-05",
+            "value": 1000,
+            "label": "INV-1001"
+          },
+          {
+            "date": "2026-02-04",
+            "value": 1000,
+            "label": "INV-1002"
+          },
+          {
+            "date": "2026-03-06",
+            "value": 1000,
+            "label": "INV-1003"
+          },
+          {
+            "date": "2026-04-05",
+            "value": 1000,
+            "label": "INV-1004"
+          },
+          {
+            "date": "2026-05-05",
+            "value": 1000,
+            "label": "INV-1005"
+          },
+          {
+            "date": "2026-06-04",
+            "value": 1000,
+            "label": "INV-1006"
+          },
+          {
+            "date": "2026-06-29",
+            "value": 1000,
+            "label": "INV-2001"
+          },
+          {
+            "date": "2026-06-30",
+            "value": 1000,
+            "label": "INV-2002"
+          }
+        ]
+      }
+    ],
+    "metrics": [
+      {
+        "label": "Avg days late",
+        "value": "-2d (stable)",
+        "tone": "good"
+      },
+      {
+        "label": "Order cadence",
+        "value": "every ~25d · repeat",
+        "tone": "good"
+      },
+      {
+        "label": "Last order",
+        "value": "4d ago",
+        "tone": "neutral"
+      },
+      {
+        "label": "Churn score",
+        "value": "0.07",
+        "tone": "good"
+      }
+    ]
+  }
+}

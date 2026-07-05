@@ -3,6 +3,7 @@
   "companyName": "Dana Retail Ltd",
   "role": "customer",
   "companyNumber": "14630315",
+  "matchConfidence": "exact",
   "companiesHouse": {
     "companyNumber": "14630315",
     "companyName": "DANA RETAIL LIMITED",
@@ -60,8 +61,16 @@
       }
     ],
     "profileUrl": "https://find-and-update.company-information.service.gov.uk/company/14630315",
-    "lastChecked": "2026-07-04"
+    "lastChecked": "2026-07-05",
+    "officers": {
+      "activeCount": 1,
+      "resignedLast12m": 0
+    },
+    "chargesOutstanding": 0,
+    "insolvencyCases": 0,
+    "accountsNextDue": "2026-11-30"
   },
   "news": [],
-  "updatedAt": "2026-07-04"
+  "gazetteNotices": [],
+  "updatedAt": "2026-07-05"
 }

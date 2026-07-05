@@ -60,6 +60,17 @@ export function strategicSignals(inputs: SignalInputs): Signal[] {
       arr.push({ month, margin });
     }
   }
+  // Monthly revenue per item — turns margin drift (%) into money leaked (£/mo).
+  const monthlyItemRevenue = new Map<string, number[]>();
+  for (const inv of realOrders) {
+    for (const li of inv.lineItems) {
+      if (!li.itemCode || li.unitCost === undefined) continue;
+      const arr = monthlyItemRevenue.get(li.itemCode) ?? [];
+      arr.push(li.lineAmount);
+      monthlyItemRevenue.set(li.itemCode, arr);
+    }
+  }
+
   for (const [itemCode, points] of byItem) {
     const byMonth = groupBy(points, (p) => p.month as string);
     const months = [...byMonth.keys()].sort();
@@ -69,12 +80,16 @@ export function strategicSignals(inputs: SignalInputs): Signal[] {
     const last = mean(series.slice(-2));
     const driftPts = (first - last) * 100; // percentage points lost
     if (driftPts > 8) {
+      // £ leaked per month ≈ mean monthly revenue on this line × margin points lost
+      const revs = monthlyItemRevenue.get(itemCode) ?? [];
+      const monthlyRev = revs.reduce((s, v) => s + v, 0) / months.length;
       signals.push({
         id: `margin-drift:${itemCode}`,
         category: "strategic",
         type: "margin-drift",
         severity: driftPts > 15 ? "high" : "medium",
         score: round(Math.min(1, driftPts / 30), 3),
+        impact: round((monthlyRev * driftPts) / 100),
         title: `${itemCode} margin drifted ${round(first * 100)}% → ${round(last * 100)}% over ${months.length} months`,
         reasoning: [
           `Monthly margin series: ${series.map((m) => `${round(m * 100)}%`).join(" → ")}`,
@@ -121,6 +136,10 @@ export function strategicSignals(inputs: SignalInputs): Signal[] {
             type: "churn-cohort-match",
             severity: "high",
             score: round(Math.min(1, currentStretch / (cohortStretch * 1.5)), 3),
+            // At risk: their typical order value — what one lost cycle costs.
+            impact: round(
+              (revenue.get(c.contactId) ?? 0) / Math.max(1, cadence.get(c.contactId)?.orderCount ?? 1),
+            ),
             title: `${name} is behaving like customers ~2 months before they churned`,
             contactId: c.contactId,
             reasoning: [

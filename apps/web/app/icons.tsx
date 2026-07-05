@@ -149,3 +149,11 @@ export const XCircle = ({ size = 18, style }: IconProps) => (
     <path d="m9 9 6 6M15 9l-6 6" />
   </svg>
 );
+
+export const House = ({ size = 18, style }: IconProps) => (
+  <svg {...base(size)} style={style}>
+    <path d="m3 10.5 9-7.5 9 7.5" />
+    <path d="M5.5 8.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V8.5" />
+    <path d="M10 21v-6h4v6" />
+  </svg>
+);

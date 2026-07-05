@@ -8,9 +8,16 @@ export interface AppConfig {
     mcpCommand: string;
     mcpArgs: string[];
   };
-  anthropic: {
+  gemini: {
     apiKey: string;
     model: string;
+  };
+  /** Who emails come from, and how they should sound. */
+  owner: {
+    name: string;
+    business: string;
+    /** Free-text style hint fed to the LLM, e.g. "warm but direct, no corporate filler". */
+    style: string;
   };
   companiesHouse: {
     apiKey: string;
@@ -21,6 +28,9 @@ export interface AppConfig {
     apiKey: string;
   };
   contextDir: string;
+  proposalsDir: string;
+  /** Xero snapshot cache TTL — a real-org sweep is many MCP round-trips. */
+  snapshotTtlMs: number;
 }
 
 function env(name: string, fallback = ""): string {
@@ -41,9 +51,16 @@ export function loadConfig(): AppConfig {
         .map((s) => s.trim())
         .filter(Boolean),
     },
-    anthropic: {
-      apiKey: env("ANTHROPIC_API_KEY"),
-      model: env("CLAUDE_MODEL", "claude-opus-4-8"),
+    gemini: {
+      apiKey: env("GEMINI_API_KEY"),
+      // NB: there is no "gemini-3.2" — current lineup is 3.5-flash (default),
+      // 3.1-flash-lite (cheapest) and 3.1-pro-preview.
+      model: env("GEMINI_MODEL", "gemini-3.5-flash"),
+    },
+    owner: {
+      name: env("OWNER_NAME", "Accounts"),
+      business: env("BUSINESS_NAME", "our team"),
+      style: env("CHASE_STYLE", ""),
     },
     companiesHouse: {
       apiKey: env("COMPANIES_HOUSE_API_KEY"),
@@ -52,6 +69,13 @@ export function loadConfig(): AppConfig {
     news: {
       apiKey: env("NEWS_API_KEY"),
     },
-    contextDir: env("CONTEXT_DIR", "data/company-context"),
+    // Data dirs are ALWAYS adapter-scoped (…/fake vs …/mcp): demo and real data
+    // must never share a store — fake-mode ingestion would prune real contexts,
+    // and demo proposals would pollute the real approval history.
+    contextDir: `${env("CONTEXT_DIR", "data/company-context")}/${adapter === "mcp" ? "mcp" : "fake"}`,
+    proposalsDir: `${env("PROPOSALS_DIR", "data/proposals")}/${adapter === "mcp" ? "mcp" : "fake"}`,
+    // 30min for real Xero (a sweep is ~20 API calls against a 5000/day quota);
+    // 1min for the fake adapter where refreshes are free.
+    snapshotTtlMs: Number(env("SNAPSHOT_TTL_MS", adapter === "mcp" ? "1800000" : "60000")),
   };
 }

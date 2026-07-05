@@ -41,13 +41,14 @@ export function cashRecoverySignals(inputs: SignalInputs): Signal[] {
     // urgent even before it's overdue. Collect first; do NOT offer terms.
     if (isOpen && isDistressed(ctx)) {
       covered.add(inv.invoiceId);
-      const flags = ctx!.companiesHouse!.flags.join(", ");
+      const flags = (ctx!.companiesHouse!.flags ?? []).join(", ");
       signals.push({
         id: `distress-collection:${inv.invoiceId}`,
         category: "cash-recovery",
         type: "distress-collection",
         severity: "urgent",
         score: 1,
+        impact: inv.amountDue,
         title: `Collect ${inv.amountDue} from ${name} urgently — Companies House distress flags`,
         contactId: inv.contactId,
         invoiceId: inv.invoiceId,
@@ -78,6 +79,7 @@ export function cashRecoverySignals(inputs: SignalInputs): Signal[] {
         type: "partial-payment-followup",
         severity: "high",
         score: round(saturate(inv.amountDue, inv.total), 3),
+        impact: inv.amountDue,
         title: `${name} short-paid ${inv.invoiceNumber ?? inv.invoiceId}: ${inv.amountDue} outstanding`,
         contactId: inv.contactId,
         invoiceId: inv.invoiceId,
@@ -107,6 +109,7 @@ export function cashRecoverySignals(inputs: SignalInputs): Signal[] {
         type: "slip-risk-escalation",
         severity: "high",
         score: risk.score,
+        impact: inv.amountDue,
         title: `Escalate ${inv.invoiceNumber ?? inv.invoiceId} (${name}) — slip risk ${risk.score}`,
         contactId: inv.contactId,
         invoiceId: inv.invoiceId,
@@ -132,6 +135,7 @@ export function cashRecoverySignals(inputs: SignalInputs): Signal[] {
         type: "chronic-payer-soft-nudge",
         severity: "medium",
         score: round(saturate(pattern.avgDaysLate, 30), 3),
+        impact: inv.amountDue,
         title: `${name}: habitual late payer who always settles — soft nudge only`,
         contactId: inv.contactId,
         invoiceId: inv.invoiceId,
@@ -158,6 +162,7 @@ export function cashRecoverySignals(inputs: SignalInputs): Signal[] {
       type: "overdue-chase",
       severity: "medium",
       score: risk?.score ?? 0.3,
+      impact: inv.amountDue,
       title: `Chase ${inv.invoiceNumber ?? inv.invoiceId} (${name}) — ${daysBetween(inv.dueDate, snapshot.asOf)}d overdue`,
       contactId: inv.contactId,
       invoiceId: inv.invoiceId,
@@ -181,7 +186,7 @@ function chEvidence(ctx: ReturnType<SignalInputs["contextByContact"]["get"]>): S
   if (ctx.companiesHouse.profileUrl) {
     ev.push({ label: "Companies House profile", url: ctx.companiesHouse.profileUrl });
   }
-  for (const f of ctx.companiesHouse.filings.slice(0, 3)) {
+  for (const f of (ctx.companiesHouse.filings ?? []).slice(0, 3)) {
     ev.push({ label: `${f.date} ${f.description}`, url: f.pdfUrl });
   }
   return ev;

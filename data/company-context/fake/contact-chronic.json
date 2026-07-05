@@ -1,0 +1,25 @@
+{
+  "contactId": "contact-chronic",
+  "companyName": "Chronic Chris Co",
+  "role": "customer",
+  "matchConfidence": "none",
+  "chCandidates": [
+    {
+      "companyNumber": "CE028073",
+      "title": "CHRONICLES CHRISTIAN CHARITY"
+    },
+    {
+      "companyNumber": "NI675879",
+      "title": "CHRONICALLY CHRISTINE LTD",
+      "status": "dissolved"
+    },
+    {
+      "companyNumber": "17241686",
+      "title": "CHRONICALLY COLLECTIVE LTD",
+      "status": "active"
+    }
+  ],
+  "news": [],
+  "gazetteNotices": [],
+  "updatedAt": "2026-07-05"
+}

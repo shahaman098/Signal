@@ -1,0 +1,154 @@
+{
+  "id": "slip-risk-escalation:inv-13",
+  "signalId": "slip-risk-escalation:inv-13",
+  "status": "executed",
+  "createdAt": "2026-07-04T19:40:54.666Z",
+  "updatedAt": "2026-07-04T19:40:54.669Z",
+  "snapshotAsOf": "2026-07-04",
+  "signalFingerprint": "907nig",
+  "title": "Escalate INV-1013 (Chronic Chris Co) — slip risk 0.536",
+  "category": "cash-recovery",
+  "severity": "high",
+  "contactId": "contact-chronic",
+  "contactName": "Chronic Chris Co",
+  "invoiceId": "inv-13",
+  "action": {
+    "kind": "chase-email",
+    "invoiceId": "inv-13",
+    "tone": "firm"
+  },
+  "reasoning": {
+    "decision": "act-now",
+    "decisionReasoning": "20 days overdue. pays ~23.4d after due on average. payment behaviour worsening. Policy: high cash-recovery → act-now.",
+    "decidedBy": "rules",
+    "priority": 9,
+    "signalReasoning": [
+      "20 days overdue",
+      "pays ~23.4d after due on average",
+      "payment behaviour worsening"
+    ],
+    "evidence": [
+      {
+        "label": "Invoice INV-1013"
+      }
+    ]
+  },
+  "inputs": {
+    "series": [
+      {
+        "id": "payment-lateness",
+        "title": "Days late per settled invoice",
+        "unit": "days",
+        "kind": "bar",
+        "baseline": 0,
+        "points": [
+          {
+            "date": "2026-02-04",
+            "value": 10,
+            "label": "INV-1007"
+          },
+          {
+            "date": "2026-03-10",
+            "value": 14,
+            "label": "INV-1008"
+          },
+          {
+            "date": "2026-04-17",
+            "value": 22,
+            "label": "INV-1009"
+          },
+          {
+            "date": "2026-05-28",
+            "value": 33,
+            "label": "INV-1010"
+          },
+          {
+            "date": "2026-07-02",
+            "value": 38,
+            "label": "INV-1011"
+          }
+        ]
+      },
+      {
+        "id": "order-values",
+        "title": "Order value per invoice",
+        "unit": "currency",
+        "kind": "line",
+        "points": [
+          {
+            "date": "2026-01-05",
+            "value": 3000,
+            "label": "INV-1007"
+          },
+          {
+            "date": "2026-02-04",
+            "value": 3000,
+            "label": "INV-1008"
+          },
+          {
+            "date": "2026-03-06",
+            "value": 3000,
+            "label": "INV-1009"
+          },
+          {
+            "date": "2026-04-05",
+            "value": 3000,
+            "label": "INV-1010"
+          },
+          {
+            "date": "2026-04-25",
+            "value": 3500,
+            "label": "INV-1012"
+          },
+          {
+            "date": "2026-05-05",
+            "value": 3000,
+            "label": "INV-1011"
+          },
+          {
+            "date": "2026-05-25",
+            "value": 1500,
+            "label": "INV-1013"
+          }
+        ]
+      }
+    ],
+    "metrics": [
+      {
+        "label": "Avg days late",
+        "value": "23.4d (worsening)",
+        "tone": "bad"
+      },
+      {
+        "label": "Order cadence",
+        "value": "every ~23d · repeat",
+        "tone": "good"
+      },
+      {
+        "label": "Last order",
+        "value": "40d ago",
+        "tone": "neutral"
+      },
+      {
+        "label": "Churn score",
+        "value": "0.28",
+        "tone": "good"
+      },
+      {
+        "label": "Overdue balance",
+        "value": "5000",
+        "tone": "bad"
+      }
+    ]
+  },
+  "result": {
+    "executedAt": "2026-07-04T19:40:54.669Z",
+    "emailDraft": {
+      "subject": "Reminder: invoice INV-1013 — 1500",
+      "body": "Hi Chronic Chris Co,\n\nThis is a friendly reminder that invoice INV-1013 for 1500 was due on 2026-06-14 (now 20 days overdue).\n\nIf you've already sent payment, thank you and please ignore this note. Otherwise, we'd appreciate settlement at your earliest convenience, or a quick reply if anything's holding it up.\n\nMany thanks,\nAccounts, our team",
+      "generatedBy": "template"
+    },
+    "note": "Email drafted — send it from your mail client"
+  },
+  "autoExecuted": true
+}

@@ -1,0 +1,26 @@
+{
+  "contactId": "contact-cohort",
+  "companyName": "Casey Trajectory Ltd",
+  "role": "customer",
+  "matchConfidence": "none",
+  "chCandidates": [
+    {
+      "companyNumber": "16603246",
+      "title": "ASSURED TRAJECTORY CONSULTING LIMITED",
+      "status": "active"
+    },
+    {
+      "companyNumber": "15036361",
+      "title": "BLUE TRAJECTORY LTD",
+      "status": "active"
+    },
+    {
+      "companyNumber": "14928202",
+      "title": "5TH TRAJECTORY LTD",
+      "status": "dissolved"
+    }
+  ],
+  "news": [],
+  "gazetteNotices": [],
+  "updatedAt": "2026-07-05"
+}

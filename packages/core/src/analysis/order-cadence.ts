@@ -1,19 +1,21 @@
 import type { Invoice, XeroSnapshot } from "../domain/types.js";
-import { daysBetween, groupBy, mean, round, sortByDateAsc } from "./util.js";
+import { daysBetween, groupBy, mean, median, round, sortByDateAsc, stddev } from "./util.js";
 
 export type CustomerSegment = "new" | "repeat" | "lapsed" | "dormant";
 
 export interface OrderCadence {
   contactId: string;
   orderCount: number;
-  /** Mean days between consecutive orders (0 if <2 orders). */
+  /** Median days between consecutive orders (0 if <2 orders) — robust to outliers. */
   frequencyDays: number;
+  /** Std-dev of inter-order gaps — how regular the cadence is. */
+  gapStd: number;
   /** Days since the most recent order, relative to snapshot.asOf. */
   recencyDays: number;
   firstOrderDate: string | null;
   lastOrderDate: string | null;
   segment: CustomerSegment;
-  /** True when recency has stretched well past this customer's own cadence. */
+  /** True when recency has stretched beyond μ+2σ of their own gap distribution. */
   overdueForReorder: boolean;
 }
 
@@ -25,7 +27,6 @@ function orderInvoices(invoices: Invoice[]): Invoice[] {
 }
 
 const ABSOLUTE_LAPSE_DAYS = 90; // floor for "lapsed" regardless of cadence
-const DORMANT_MULTIPLIER = 2; // recency > 2× cadence ⇒ overdue for reorder
 
 export function computeOrderCadence(snapshot: XeroSnapshot): OrderCadence[] {
   const byContact = groupBy(snapshot.invoices, (inv) => inv.contactId);
@@ -40,6 +41,7 @@ export function computeOrderCadence(snapshot: XeroSnapshot): OrderCadence[] {
         contactId,
         orderCount: 0,
         frequencyDays: 0,
+        gapStd: 0,
         recencyDays: Infinity,
         firstOrderDate: null,
         lastOrderDate: null,
@@ -57,12 +59,18 @@ export function computeOrderCadence(snapshot: XeroSnapshot): OrderCadence[] {
     for (let i = 1; i < orders.length; i++) {
       gaps.push(daysBetween(orders[i - 1]!.issueDate, orders[i]!.issueDate));
     }
-    const frequencyDays = gaps.length ? round(mean(gaps)) : 0;
+    // Median beats mean here: one long holiday gap shouldn't redefine cadence.
+    const frequencyDays = gaps.length ? round(median(gaps)) : 0;
+    const gapStd = gaps.length ? round(stddev(gaps)) : 0;
 
-    const lapseThreshold = frequencyDays
-      ? Math.max(ABSOLUTE_LAPSE_DAYS, frequencyDays * DORMANT_MULTIPLIER)
-      : ABSOLUTE_LAPSE_DAYS;
-    const overdueForReorder = frequencyDays > 0 && recencyDays > frequencyDays * DORMANT_MULTIPLIER;
+    // Statistical lapse point: a customer is "late to reorder" once recency
+    // exceeds μ+2σ of their own gap distribution — i.e. the current silence
+    // would sit in the top ~2.5% of their historical gaps. Floored at the
+    // absolute threshold so sparse data can't produce a hair-trigger.
+    const gapMean = gaps.length ? mean(gaps) : 0;
+    const statisticalLapse = gaps.length ? gapMean + 2 * Math.max(gapStd, gapMean * 0.25) : 0;
+    const lapseThreshold = Math.max(ABSOLUTE_LAPSE_DAYS, statisticalLapse);
+    const overdueForReorder = gaps.length > 0 && recencyDays > statisticalLapse;
 
     let segment: CustomerSegment;
     if (recencyDays > lapseThreshold * 2) segment = "dormant";
@@ -74,6 +82,7 @@ export function computeOrderCadence(snapshot: XeroSnapshot): OrderCadence[] {
       contactId,
       orderCount,
       frequencyDays,
+      gapStd,
       recencyDays,
       firstOrderDate,
       lastOrderDate,

@@ -6,7 +6,7 @@ import { computeSlipRisk, isOverdue } from "./slip-risk.js";
 import { computeRecoverable } from "./recoverable.js";
 import { computeChurnSignals } from "./churn.js";
 import { buildReceivablesReport } from "./report.js";
-import { daysBetween, saturate, clamp01 } from "./util.js";
+import { daysBetween, saturate, clamp01, median, stddev, olsSlope, logistic, shrink } from "./util.js";
 
 const snapshot = makeDemoSnapshot();
 
@@ -21,6 +21,35 @@ describe("util", () => {
     expect(saturate(120, 90)).toBe(1);
     expect(clamp01(-3)).toBe(0);
     expect(clamp01(3)).toBe(1);
+  });
+
+  it("median is robust to outliers", () => {
+    expect(median([30, 30, 30, 200])).toBe(30);
+    expect(median([1, 2, 3])).toBe(2);
+    expect(median([])).toBe(0);
+  });
+
+  it("stddev computes population spread", () => {
+    expect(stddev([2, 4, 4, 4, 5, 5, 7, 9])).toBeCloseTo(2, 5);
+    expect(stddev([5])).toBe(0);
+  });
+
+  it("olsSlope fits a linear trend", () => {
+    expect(olsSlope([0, 1, 2, 3].map((x) => ({ x, y: 10 + 5 * x })))).toBeCloseTo(5, 6);
+    expect(olsSlope([{ x: 0, y: 1 }])).toBe(0); // insufficient data
+    expect(olsSlope([0, 1, 2, 3].map((x) => ({ x, y: 7 })))).toBe(0); // flat
+  });
+
+  it("logistic maps ℝ → (0,1) with 0.5 at zero", () => {
+    expect(logistic(0)).toBe(0.5);
+    expect(logistic(10)).toBeGreaterThan(0.99);
+    expect(logistic(-10)).toBeLessThan(0.01);
+  });
+
+  it("empirical-Bayes shrinkage pulls small samples toward the prior", () => {
+    expect(shrink(30, 0, 7, 3)).toBe(7); // no data → prior
+    expect(shrink(30, 3, 7, 3)).toBeCloseTo(18.5, 5); // half-weight
+    expect(shrink(30, 300, 7, 3)).toBeCloseTo(29.77, 1); // data dominates
   });
 });
 

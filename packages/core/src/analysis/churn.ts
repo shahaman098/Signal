@@ -9,7 +9,7 @@ import {
   indexByContact,
   type PaymentPattern,
 } from "./payment-pattern.js";
-import { clamp01, daysBetween, groupBy, round, saturate } from "./util.js";
+import { clamp01, daysBetween, groupBy, logistic, round, saturate } from "./util.js";
 
 export interface ChurnSignal {
   contactId: string;
@@ -75,13 +75,21 @@ export function computeChurnSignals(
     const decliningOrders = prior > 0 && recent < prior;
     const worseningPayment = pattern?.trend === "worsening";
 
-    // Recency component: scales with how far past the lapse threshold we are.
-    const lapseThreshold = cadence?.frequencyDays
-      ? Math.max(90, cadence.frequencyDays * 2)
-      : 90;
-    const recencyComponent = cadence
-      ? saturate(cadence.recencyDays === Infinity ? lapseThreshold * 2 : cadence.recencyDays, lapseThreshold * 2)
-      : 1;
+    // Recency component: z-score the current silence against the customer's
+    // OWN inter-order gap distribution, then squash through a logistic link.
+    // z = 0 → ordered right on schedule; z = +2 → silence already in the top
+    // ~2.5% of their historical gaps.
+    let recencyComponent: number;
+    if (cadence && cadence.frequencyDays > 0 && cadence.recencyDays !== Infinity) {
+      const sigma = Math.max(cadence.gapStd, cadence.frequencyDays * 0.25, 7);
+      const z = (cadence.recencyDays - cadence.frequencyDays) / sigma;
+      recencyComponent = logistic(1.2 * z - 0.5);
+    } else if (cadence && cadence.recencyDays !== Infinity) {
+      // Single-order customers: no gap distribution — fall back to absolute age.
+      recencyComponent = saturate(cadence.recencyDays, 180);
+    } else {
+      recencyComponent = 1;
+    }
 
     // Volume component: proportional drop from prior to recent window.
     const volumeComponent = prior > 0 ? clamp01((prior - recent) / prior) : recent === 0 ? 0.5 : 0;

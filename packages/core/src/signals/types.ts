@@ -68,6 +68,12 @@ export interface Signal {
   severity: Severity;
   /** 0–1 priority within its severity band. */
   score: number;
+  /**
+   * Estimated money at stake, in book currency: balance recoverable, order
+   * value winnable, saving available, monthly margin leaking. Ranks signals
+   * by impact within a severity band. Absent for pure risk flags.
+   */
+  impact?: number;
   title: string;
   contactId?: string;
   invoiceId?: string;

@@ -1,10 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
 import type {
   CompanyContext,
   RecommendedAction,
   Signal,
   SignalRunResult,
 } from "@signal/core";
+import type { GeminiClient } from "../llm/gemini.js";
 import type { SignalsService } from "./signals.service.js";
 
 /**
@@ -12,7 +12,7 @@ import type { SignalsService } from "./signals.service.js";
  * company's context document (Companies House flags, filings, news) — and
  * decides what to do about each signal, with explicit reasoning.
  *
- * With ANTHROPIC_API_KEY set, Claude makes the calls (it can weigh nuances the
+ * With GEMINI_API_KEY set, Gemini makes the calls (it can weigh nuances the
  * rules can't: e.g. soften a chase because the customer just had bad press, or
  * bump an upsell because funding landed). Offline, a deterministic policy maps
  * severity → decision so the endpoint (and tests) always work.
@@ -27,46 +27,59 @@ export interface AgentDecision {
   priority: number; // 1 = first
   reasoning: string;
   action: RecommendedAction;
-  decidedBy: "claude" | "rules";
+  decidedBy: "gemini" | "rules";
 }
 
 export interface AgentRunResult {
   asOf: string;
   decisions: AgentDecision[];
-  decidedBy: "claude" | "rules";
+  decidedBy: "gemini" | "rules";
 }
 
-export class AgentService {
-  private client?: Anthropic;
+const DECISIONS_SCHEMA = {
+  type: "object",
+  properties: {
+    decisions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          signalId: { type: "string" },
+          decision: { type: "string", enum: ["act-now", "schedule", "monitor", "dismiss"] },
+          priority: { type: "integer" },
+          reasoning: { type: "string" },
+        },
+        required: ["signalId", "decision", "priority", "reasoning"],
+      },
+    },
+  },
+  required: ["decisions"],
+} as const;
 
+export class AgentService {
   constructor(
     private readonly signals: SignalsService,
-    apiKey: string,
-    private readonly model: string,
-  ) {
-    if (apiKey) this.client = new Anthropic({ apiKey });
-  }
+    private readonly llm: GeminiClient,
+  ) {}
 
   async decide(): Promise<AgentRunResult> {
     const run = await this.signals.run();
     const contexts = await this.signals.getContexts();
 
-    if (this.client) {
-      try {
-        return await this.decideWithClaude(run, contexts);
-      } catch {
-        // fall through to rules on any model/parsing failure
-      }
+    if (this.llm.enabled) {
+      const result = await this.decideWithGemini(run, contexts);
+      if (result) return result;
+      // fall through to rules on any model/parsing failure
     }
     return this.decideWithRules(run);
   }
 
-  // ---- Claude path ----
+  // ---- Gemini path ----
 
-  private async decideWithClaude(
+  private async decideWithGemini(
     run: SignalRunResult,
     contexts: CompanyContext[],
-  ): Promise<AgentRunResult> {
+  ): Promise<AgentRunResult | null> {
     const contextByContact = new Map(contexts.map((c) => [c.contactId, c]));
     const payload = {
       asOf: run.asOf,
@@ -83,9 +96,7 @@ export class AgentService {
       })),
     };
 
-    const message = await this.client!.messages.create({
-      model: this.model,
-      max_tokens: 4000,
+    const text = await this.llm.complete({
       system:
         "You are the operations agent for a small business's finance stack. You receive detected " +
         "signals (cash recovery, revenue growth, cashflow timing, strategic, anomaly) each with a " +
@@ -93,39 +104,38 @@ export class AgentService {
         "Decide for each signal: act-now, schedule, monitor, or dismiss. Adjust for context — e.g. " +
         "collect urgently from distressed companies before offering terms; never suggest payment " +
         "plans for them; time upsells to good news; keep soft tones for reliable payers. " +
-        'Return ONLY a JSON array: [{"signalId","decision","priority","reasoning"}], priority 1 = first.',
-      messages: [{ role: "user", content: JSON.stringify(payload) }],
+        "Priority 1 = first.",
+      prompt: JSON.stringify(payload),
+      maxTokens: 4000,
+      jsonSchema: DECISIONS_SCHEMA as unknown as Record<string, unknown>,
     });
+    if (!text) return null;
 
-    const text = message.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("");
-    const parsed = JSON.parse(text) as {
-      signalId: string;
-      decision: AgentDecisionKind;
-      priority: number;
-      reasoning: string;
-    }[];
-
-    const byId = new Map(run.signals.map((s) => [s.id, s]));
-    const decisions: AgentDecision[] = [];
-    for (const d of parsed) {
-      const signal = byId.get(d.signalId);
-      if (!signal) continue;
-      decisions.push({
-        signalId: d.signalId,
-        signalTitle: signal.title,
-        decision: d.decision,
-        priority: d.priority,
-        reasoning: d.reasoning,
-        action: signal.recommendedAction,
-        decidedBy: "claude",
-      });
+    try {
+      const parsed = JSON.parse(text) as {
+        decisions: { signalId: string; decision: AgentDecisionKind; priority: number; reasoning: string }[];
+      };
+      const byId = new Map(run.signals.map((s) => [s.id, s]));
+      const decisions: AgentDecision[] = [];
+      for (const d of parsed.decisions ?? []) {
+        const signal = byId.get(d.signalId);
+        if (!signal) continue;
+        decisions.push({
+          signalId: d.signalId,
+          signalTitle: signal.title,
+          decision: d.decision,
+          priority: d.priority,
+          reasoning: d.reasoning,
+          action: signal.recommendedAction,
+          decidedBy: "gemini",
+        });
+      }
+      if (decisions.length === 0) return null;
+      decisions.sort((a, b) => a.priority - b.priority);
+      return { asOf: run.asOf, decisions, decidedBy: "gemini" };
+    } catch {
+      return null;
     }
-    if (decisions.length === 0) throw new Error("Claude returned no matching decisions");
-    decisions.sort((a, b) => a.priority - b.priority);
-    return { asOf: run.asOf, decisions, decidedBy: "claude" };
   }
 
   // ---- Deterministic fallback ----
@@ -161,7 +171,7 @@ function summariseContext(ctx: CompanyContext | undefined) {
     role: ctx.role,
     chStatus: ctx.companiesHouse?.status,
     chFlags: ctx.companiesHouse?.flags ?? [],
-    recentFilings: ctx.companiesHouse?.filings.slice(0, 3).map((f) => `${f.date} ${f.description}`),
-    news: ctx.news.slice(0, 3).map((n) => `[${n.sentiment}] ${n.title} (${n.source})`),
+    recentFilings: ctx.companiesHouse?.filings?.slice(0, 3).map((f) => `${f.date} ${f.description}`),
+    news: (ctx.news ?? []).slice(0, 3).map((n) => `[${n.sentiment}] ${n.title} (${n.source})`),
   };
 }

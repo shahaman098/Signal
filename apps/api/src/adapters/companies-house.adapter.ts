@@ -1,8 +1,9 @@
 import type {
   CompaniesHouseData,
   CompaniesHouseFlag,
-  CompaniesHouseFiling,
+  CompanyCandidate,
   CompanyIntelPort,
+  CompanyLookupResult,
 } from "@signal/core";
 
 /**
@@ -39,43 +40,86 @@ export class CompaniesHouseAdapter implements CompanyIntelPort {
     return (await res.json()) as T;
   }
 
-  async lookupCompany(companyName: string): Promise<CompaniesHouseData | null> {
+  /**
+   * Tiered lookup. Search is fuzzy ("Reliable Rita Ltd" happily returns "AEER
+   * RITA CARE LTD"), and a wrong match could pin another company's distress
+   * flags on a customer — so: exact-normalised name → auto; all-tokens-contained
+   * → "probable"; anything else → candidates for a human to confirm.
+   */
+  async lookupCompany(companyName: string): Promise<CompanyLookupResult> {
     const search = await this.get<{
-      items?: { company_number: string; title: string }[];
-    }>(`/search/companies?q=${encodeURIComponent(companyName)}&items_per_page=5`);
-    // Only accept a hit whose registered name actually matches ours. Search is
-    // fuzzy ("Reliable Rita Ltd" happily returns "AEER RITA CARE LTD"), and a
-    // wrong match could pin another company's distress flags on a customer —
-    // no data is strictly safer than wrong data.
-    const hit = (search?.items ?? []).find((i) => namesMatch(companyName, i.title));
-    if (!hit) return null;
+      items?: { company_number: string; title: string; company_status?: string }[];
+    }>(`/search/companies?q=${encodeURIComponent(companyName)}&items_per_page=10`);
+    const items = search?.items ?? [];
 
-    const num = hit.company_number;
-    const [profile, filingHistory] = await Promise.all([
+    const exact = items.find((i) => namesMatch(companyName, i.title));
+    const probable = exact ?? items.find((i) => probableMatch(companyName, i.title));
+    if (probable) {
+      const data = await this.lookupByNumber(probable.company_number);
+      if (data) return { confidence: exact ? "exact" : "probable", data };
+    }
+
+    const candidates: CompanyCandidate[] = items.slice(0, 3).map((i) => ({
+      companyNumber: i.company_number,
+      title: i.title,
+      status: i.company_status,
+    }));
+    return { confidence: "none", candidates };
+  }
+
+  /** Full fetch by registration number: profile, filings, officers, charges, insolvency. */
+  async lookupByNumber(num: string): Promise<CompaniesHouseData | null> {
+    const [profile, filingHistory, officers, charges, insolvency] = await Promise.all([
       this.get<ChProfile>(`/company/${num}`),
       this.get<ChFilingHistory>(`/company/${num}/filing-history?items_per_page=10`),
+      this.get<ChOfficers>(`/company/${num}/officers?items_per_page=50`).catch(() => null),
+      this.get<ChCharges>(`/company/${num}/charges`).catch(() => null),
+      this.get<ChInsolvency>(`/company/${num}/insolvency`).catch(() => null),
     ]);
     if (!profile) return null;
 
+    const yearAgo = new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10);
+    const officerItems = officers?.items ?? [];
+    const activeCount = officerItems.filter((o) => !o.resigned_on).length;
+    const resignedLast12m = officerItems.filter((o) => o.resigned_on && o.resigned_on >= yearAgo).length;
+
+    const sixMonthsAgo = new Date(Date.now() - 183 * 86_400_000).toISOString().slice(0, 10);
+    const chargeItems = charges?.items ?? [];
+    const chargesOutstanding = chargeItems.filter((c) => c.status === "outstanding").length;
+    const recentCharge = chargeItems.some(
+      (c) => c.status === "outstanding" && (c.created_on ?? "") >= sixMonthsAgo,
+    );
+    const insolvencyCases = insolvency?.cases?.length ?? 0;
+
+    const flags = deriveFlags(profile);
+    if (resignedLast12m >= 2) flags.push("recent-officer-exodus");
+    if (recentCharge) flags.push("charge-registered");
+    if (insolvencyCases > 0) flags.push("insolvency-history");
+
     return {
       companyNumber: num,
-      companyName: profile.company_name ?? hit.title,
+      companyName: profile.company_name ?? num,
       status: profile.company_status ?? "unknown",
       incorporatedOn: profile.date_of_creation,
-      flags: deriveFlags(profile),
+      flags,
       filings: (filingHistory?.items ?? []).map((f) => ({
         date: f.date,
         type: f.type,
         description: humaniseFiling(f),
-        // Human-clickable filing PDF: the public site's document route (302s to a
-        // signed PDF). The API's document_metadata link needs auth, so a browser
-        // click on it would 404 — verified live.
-        pdfUrl: f.transaction_id
-          ? `${PUBLIC_BASE}/company/${num}/filing-history/${f.transaction_id}/document?format=pdf&download=0`
-          : undefined,
+        // Human-clickable filing PDF via the public site's document route (302s
+        // to a signed PDF). Only emitted when the filing actually HAS a document
+        // (document_metadata present) — linking docless filings just errors.
+        pdfUrl:
+          f.transaction_id && f.links?.document_metadata
+            ? `${PUBLIC_BASE}/company/${num}/filing-history/${f.transaction_id}/document?format=pdf&download=0`
+            : undefined,
       })),
       profileUrl: `${PUBLIC_BASE}/company/${num}`,
       lastChecked: new Date().toISOString().slice(0, 10),
+      officers: { activeCount, resignedLast12m },
+      chargesOutstanding,
+      insolvencyCases,
+      accountsNextDue: profile.accounts?.next_due,
     };
   }
 }
@@ -89,6 +133,21 @@ const PUBLIC_BASE = "https://find-and-update.company-information.service.gov.uk"
  */
 export function namesMatch(a: string, b: string): boolean {
   return normaliseCompanyName(a) === normaliseCompanyName(b);
+}
+
+/**
+ * "Probable" tier: every meaningful token of the contact's name appears in the
+ * registered title (≥2 tokens, so single-word names can't false-positive).
+ * "Hamilton Smith Ltd" ≈ "HAMILTON SMITH CONSULTING LIMITED" → probable.
+ * "Reliable Rita Ltd" vs "AEER RITA CARE LTD" → only 1 of 2 tokens → no.
+ */
+export function probableMatch(query: string, title: string): boolean {
+  const queryTokens = normaliseCompanyName(query)
+    .split(" ")
+    .filter((t) => t.length > 1 && !["LTD", "PLC", "LLP", "THE"].includes(t));
+  if (queryTokens.length < 2) return false;
+  const titleTokens = new Set(normaliseCompanyName(title).split(" "));
+  return queryTokens.every((t) => titleTokens.has(t));
 }
 
 function normaliseCompanyName(name: string): string {
@@ -120,8 +179,17 @@ interface ChProfile {
   company_name?: string;
   company_status?: string;
   date_of_creation?: string;
-  accounts?: { overdue?: boolean };
+  accounts?: { overdue?: boolean; next_due?: string };
   confirmation_statement?: { overdue?: boolean };
+}
+interface ChOfficers {
+  items?: { name?: string; resigned_on?: string }[];
+}
+interface ChCharges {
+  items?: { status?: string; created_on?: string }[];
+}
+interface ChInsolvency {
+  cases?: { type?: string }[];
 }
 interface ChFilingHistory {
   items?: {

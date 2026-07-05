@@ -72,8 +72,12 @@ export function runSignalEngine(snapshot: EnrichedSnapshot): SignalRunResult {
   return { asOf: snapshot.asOf, signals, countsByCategory, countsBySeverity };
 }
 
+/** Severity first, then money at stake, then model score. */
 function moreImportant(a: Signal, b: Signal): boolean {
   const dr = SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity];
   if (dr !== 0) return dr > 0;
+  const ai = a.impact ?? 0;
+  const bi = b.impact ?? 0;
+  if (ai !== bi) return ai > bi;
   return a.score > b.score;
 }

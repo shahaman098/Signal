@@ -40,9 +40,12 @@ export interface XeroPort {
   snapshot(): Promise<XeroSnapshot>;
 
   // ---- Writes ----
+  // deepLink (when the backend provides one) opens the created object in Xero.
   /** Flagship: reactivation / recurring-conversion offer. */
-  createQuote(input: CreateQuoteInput): Promise<{ quoteId: string }>;
+  createQuote(input: CreateQuoteInput): Promise<{ quoteId: string; deepLink?: string }>;
   /** Draft only — never auto-authorised. */
-  createInvoiceDraft(input: CreateInvoiceDraftInput): Promise<{ invoiceId: string }>;
-  createPayment(input: CreatePaymentInput): Promise<{ paymentId: string }>;
+  createInvoiceDraft(
+    input: CreateInvoiceDraftInput,
+  ): Promise<{ invoiceId: string; deepLink?: string }>;
+  createPayment(input: CreatePaymentInput): Promise<{ paymentId: string; deepLink?: string }>;
 }

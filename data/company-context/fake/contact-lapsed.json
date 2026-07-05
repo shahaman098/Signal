@@ -1,0 +1,26 @@
+{
+  "contactId": "contact-lapsed",
+  "companyName": "Lapsed Lucy Trading",
+  "role": "customer",
+  "matchConfidence": "none",
+  "chCandidates": [
+    {
+      "companyNumber": "14241160",
+      "title": "LAPSED LTD",
+      "status": "active"
+    },
+    {
+      "companyNumber": "14118330",
+      "title": "LAPSED PEDALS LTD",
+      "status": "active"
+    },
+    {
+      "companyNumber": "12055760",
+      "title": "LAPSED DOMAINS LIMITED",
+      "status": "dissolved"
+    }
+  ],
+  "news": [],
+  "gazetteNotices": [],
+  "updatedAt": "2026-07-05"
+}

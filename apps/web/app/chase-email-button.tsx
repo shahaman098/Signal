@@ -24,8 +24,8 @@ export function ChaseEmailButton({ invoiceId }: { invoiceId: string }) {
 
   return (
     <div>
-      <button className="btn" onClick={onClick} disabled={loading}>
-        <Mail size={14} /> {loading ? "Drafting…" : "Draft chase email"}
+      <button className="btn sm" onClick={onClick} disabled={loading}>
+        <Mail size={13} /> {loading ? "Drafting…" : "Chase"}
       </button>
       {error && <div style={{ color: "var(--critical)", fontSize: 12, marginTop: 4 }}>{error}</div>}
       {draft && (

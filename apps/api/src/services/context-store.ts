@@ -1,6 +1,22 @@
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { CompanyContext } from "@signal/core";
+
+/**
+ * Context files on disk may predate newer schema fields (the store outlives
+ * code changes) — fill array defaults so consumers never hit undefined.
+ */
+function normalise(c: CompanyContext): CompanyContext {
+  return {
+    ...c,
+    news: c.news ?? [],
+    gazetteNotices: c.gazetteNotices ?? [],
+    chCandidates: c.chCandidates ?? undefined,
+    companiesHouse: c.companiesHouse
+      ? { ...c.companiesHouse, flags: c.companiesHouse.flags ?? [], filings: c.companiesHouse.filings ?? [] }
+      : undefined,
+  };
+}
 
 /**
  * Persists one context JSON file per company under CONTEXT_DIR. This is the
@@ -27,9 +43,17 @@ export class ContextStore {
 
   async load(contactId: string): Promise<CompanyContext | null> {
     try {
-      return JSON.parse(await readFile(this.fileFor(contactId), "utf8")) as CompanyContext;
+      return normalise(JSON.parse(await readFile(this.fileFor(contactId), "utf8")) as CompanyContext);
     } catch {
       return null;
+    }
+  }
+
+  async remove(contactId: string): Promise<void> {
+    try {
+      await unlink(this.fileFor(contactId));
+    } catch {
+      // already gone
     }
   }
 
@@ -40,7 +64,7 @@ export class ContextStore {
       for (const f of files) {
         if (!f.endsWith(".json")) continue;
         try {
-          out.push(JSON.parse(await readFile(join(this.dir, f), "utf8")) as CompanyContext);
+          out.push(normalise(JSON.parse(await readFile(join(this.dir, f), "utf8")) as CompanyContext));
         } catch {
           // skip corrupt files rather than failing the whole read
         }

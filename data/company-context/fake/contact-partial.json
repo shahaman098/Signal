@@ -1,0 +1,26 @@
+{
+  "contactId": "contact-partial",
+  "companyName": "Partial Pat Ltd",
+  "role": "customer",
+  "matchConfidence": "none",
+  "chCandidates": [
+    {
+      "companyNumber": "00654873",
+      "title": "BRADBURY FIELDS-SERVICES FOR BLIND AND PARTIALLY SIGHTED PEOPLE",
+      "status": "active"
+    },
+    {
+      "companyNumber": "04815165",
+      "title": "BURY SOCIETY FOR BLIND AND PARTIALLY SIGHTED PEOPLE",
+      "status": "active"
+    },
+    {
+      "companyNumber": "05357432",
+      "title": "THE CORNWALL BLIND AND PARTIALLY SIGHTED ASSOCIATION",
+      "status": "active"
+    }
+  ],
+  "news": [],
+  "gazetteNotices": [],
+  "updatedAt": "2026-07-05"
+}

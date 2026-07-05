@@ -1,9 +1,11 @@
 import type { Invoice, XeroSnapshot } from "../domain/types.js";
 import { computePaymentPatterns, indexByContact, type PaymentPattern } from "./payment-pattern.js";
-import { clamp01, daysBetween, round, saturate } from "./util.js";
+import { clamp01, daysBetween, logistic, mean, round, shrink, stddev } from "./util.js";
 
 export interface SlipRisk {
   invoiceId: string;
+  /** Human-readable reference (INV-0042) — prefer over the GUID in UIs. */
+  invoiceNumber?: string;
   contactId: string;
   amountDue: number;
   daysOverdue: number;
@@ -19,19 +21,49 @@ export function isOverdue(invoice: Invoice, asOf: string): boolean {
   return collectible && invoice.amountDue > 0.005 && daysBetween(invoice.dueDate, asOf) > 0;
 }
 
-// Weights sum to 1. Tuned so a chronically-late customer with a long-overdue,
-// worsening-trend invoice lands in the "high" band.
-const W_DAYS = 0.4;
-const W_HABIT = 0.35;
-const W_TREND = 0.25;
-const DAYS_CAP = 90; // ≥90 days overdue saturates the recency component
-const HABIT_CAP = 30; // avg 30+ days late saturates the habit component
+/**
+ * Slip-risk model.
+ *
+ * The question: "how far outside this customer's own payment behaviour is
+ * this invoice, and is that behaviour deteriorating?" — an invoice 20 days
+ * overdue is routine for a customer who always pays ~25 days late, and a
+ * red flag for one who always pays on time.
+ *
+ *   1. Estimate the customer's lateness distribution (μ, σ) from their
+ *      settled invoices, SHRUNK toward the portfolio-wide distribution with
+ *      empirical-Bayes weighting (prior strength K_PRIOR) — so a customer
+ *      with 2 data points mostly inherits the book's behaviour, one with 20
+ *      speaks for themselves.
+ *   2. z-score the invoice's days-overdue against that distribution: how
+ *      many σ beyond their normal settling point is this balance?
+ *   3. Add the payment-trend term (OLS slope of lateness per invoice).
+ *   4. Squash through a logistic link into (0, 1).
+ *
+ *   risk = σ( W_Z·z + W_SLOPE·(slope/10) + BIAS )
+ */
+const K_PRIOR = 3; // prior strength: worth 3 observations
+const SIGMA_FLOOR = 3; // days — protects z from near-zero variance customers
+const W_Z = 0.9;
+const W_SLOPE = 0.6;
+const BIAS = -0.6; // sets risk ≈ 0.35 for a perfectly in-pattern invoice
+const FALLBACK_PRIOR_MEAN = 7; // used only when the whole book has no history
+const FALLBACK_PRIOR_STD = 10;
 
 export function computeSlipRisk(
   snapshot: XeroSnapshot,
   patterns?: PaymentPattern[],
 ): SlipRisk[] {
-  const patternIndex = indexByContact(patterns ?? computePaymentPatterns(snapshot));
+  const allPatterns = patterns ?? computePaymentPatterns(snapshot);
+  const patternIndex = indexByContact(allPatterns);
+
+  // Portfolio prior: the lateness distribution across every settled invoice
+  // in the book (weighted by per-contact means; robust enough at this scale).
+  const settled = allPatterns.filter((p) => p.sampleSize > 0);
+  const priorMean = settled.length ? mean(settled.map((p) => p.avgDaysLate)) : FALLBACK_PRIOR_MEAN;
+  const priorStd = settled.length
+    ? Math.max(stddev(settled.map((p) => p.avgDaysLate)), FALLBACK_PRIOR_STD)
+    : FALLBACK_PRIOR_STD;
+
   const results: SlipRisk[] = [];
 
   for (const invoice of snapshot.invoices) {
@@ -39,34 +71,35 @@ export function computeSlipRisk(
 
     const daysOverdue = daysBetween(invoice.dueDate, snapshot.asOf);
     const pattern = patternIndex.get(invoice.contactId);
+    const n = pattern?.sampleSize ?? 0;
 
-    const daysComponent = saturate(daysOverdue, DAYS_CAP);
-    const habitComponent = pattern ? saturate(Math.max(0, pattern.avgDaysLate), HABIT_CAP) : 0.5;
-    const trendComponent = pattern
-      ? clamp01(0.5 + pattern.trendDelta / (2 * HABIT_CAP))
-      : 0.5;
-
-    // Down-weight the behavioural terms when we have little history on the customer.
-    const confidence = pattern ? pattern.reliability : 0;
-    const behaviouralBlend = confidence;
-    const score = clamp01(
-      W_DAYS * daysComponent +
-        W_HABIT * (behaviouralBlend * habitComponent + (1 - behaviouralBlend) * 0.5) +
-        W_TREND * (behaviouralBlend * trendComponent + (1 - behaviouralBlend) * 0.5),
+    // Empirical-Bayes posterior for this customer's lateness distribution.
+    const mu = shrink(pattern?.avgDaysLate ?? 0, n, priorMean, K_PRIOR);
+    const sigma = Math.max(
+      shrink(pattern?.stdDaysLate ?? 0, n, priorStd, K_PRIOR),
+      SIGMA_FLOOR,
     );
 
-    const reasons: string[] = [];
-    reasons.push(`${daysOverdue} days overdue`);
-    if (pattern && pattern.sampleSize > 0) {
-      reasons.push(`pays ~${pattern.avgDaysLate}d after due on average`);
-      if (pattern.trend === "worsening") reasons.push("payment behaviour worsening");
-      if (pattern.trend === "improving") reasons.push("payment behaviour improving");
+    const z = (daysOverdue - mu) / sigma;
+    const slope = pattern?.slopePerInvoice ?? 0;
+    const score = clamp01(logistic(W_Z * z + W_SLOPE * (slope / 10) + BIAS));
+
+    const reasons: string[] = [
+      `${daysOverdue} days overdue — ${round(z, 1)}σ beyond their typical settling point (~${round(mu)}d ±${round(sigma)}d)`,
+    ];
+    if (n > 0) {
+      reasons.push(`based on ${n} settled invoice${n === 1 ? "" : "s"} (avg ${pattern!.avgDaysLate}d late)`);
+      if (pattern!.trend === "worsening") {
+        reasons.push(`payment behaviour worsening (+${pattern!.slopePerInvoice}d per invoice)`);
+      }
+      if (pattern!.trend === "improving") reasons.push("payment behaviour improving");
     } else {
-      reasons.push("no payment history for this customer");
+      reasons.push("no settled history — using the portfolio-wide payment distribution");
     }
 
     results.push({
       invoiceId: invoice.invoiceId,
+      invoiceNumber: invoice.invoiceNumber,
       contactId: invoice.contactId,
       amountDue: round(invoice.amountDue),
       daysOverdue,

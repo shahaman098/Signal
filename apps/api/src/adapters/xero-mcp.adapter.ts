@@ -233,17 +233,19 @@ export class XeroMcpAdapter implements XeroPort {
 
   // ---- Writes ----
 
-  async createQuote(input: CreateQuoteInput): Promise<{ quoteId: string }> {
+  async createQuote(input: CreateQuoteInput): Promise<{ quoteId: string; deepLink?: string }> {
     const blocks = await this.callBlocks(TOOLS.createQuote, {
       contactId: input.contactId,
       lineItems: input.lineItems.map(toWireLineItem),
       reference: input.reference,
       summary: input.summary,
     });
-    return { quoteId: extractId(blocks) };
+    return { quoteId: extractId(blocks), deepLink: extractDeepLink(blocks) };
   }
 
-  async createInvoiceDraft(input: CreateInvoiceDraftInput): Promise<{ invoiceId: string }> {
+  async createInvoiceDraft(
+    input: CreateInvoiceDraftInput,
+  ): Promise<{ invoiceId: string; deepLink?: string }> {
     // The MCP server hardwires DRAFT status — our "never auto-authorise" policy.
     const blocks = await this.callBlocks(TOOLS.createInvoice, {
       contactId: input.contactId,
@@ -251,17 +253,17 @@ export class XeroMcpAdapter implements XeroPort {
       type: "ACCREC",
       reference: input.reference,
     });
-    return { invoiceId: extractId(blocks) };
+    return { invoiceId: extractId(blocks), deepLink: extractDeepLink(blocks) };
   }
 
-  async createPayment(input: CreatePaymentInput): Promise<{ paymentId: string }> {
+  async createPayment(input: CreatePaymentInput): Promise<{ paymentId: string; deepLink?: string }> {
     const blocks = await this.callBlocks(TOOLS.createPayment, {
       invoiceId: input.invoiceId,
       accountId: input.accountId,
       amount: input.amount,
       date: input.date,
     });
-    return { paymentId: extractId(blocks) };
+    return { paymentId: extractId(blocks), deepLink: extractDeepLink(blocks) };
   }
 }
 
@@ -416,6 +418,15 @@ function extractId(blocks: string[]): string {
     if (id) return id;
   }
   return "";
+}
+
+/** …and a "Link to view: <url>" deep link into Xero. */
+function extractDeepLink(blocks: string[]): string | undefined {
+  for (const block of blocks) {
+    const link = parseKV(block)["Link to view"];
+    if (link?.startsWith("http")) return link;
+  }
+  return undefined;
 }
 
 function num(v: string | undefined, fallback = 0): number {

@@ -1,0 +1,130 @@
+{
+  "id": "overdue-chase:einv-8",
+  "signalId": "overdue-chase:einv-8",
+  "status": "executed",
+  "createdAt": "2026-07-04T19:40:54.666Z",
+  "updatedAt": "2026-07-04T19:40:54.673Z",
+  "snapshotAsOf": "2026-07-04",
+  "signalFingerprint": "15wk88k",
+  "title": "Chase INV-2008 (Dana Retail Ltd) — 5d overdue",
+  "category": "cash-recovery",
+  "severity": "medium",
+  "contactId": "contact-distress",
+  "contactName": "Dana Retail Ltd",
+  "invoiceId": "einv-8",
+  "action": {
+    "kind": "chase-email",
+    "invoiceId": "einv-8",
+    "tone": "friendly"
+  },
+  "reasoning": {
+    "decision": "act-now",
+    "decisionReasoning": "1200 overdue since 2026-06-29. Tone \"friendly\" matched to history (avg 3.5d late, trend stable). Policy: medium cash-recovery → act-now.",
+    "decidedBy": "rules",
+    "priority": 22,
+    "signalReasoning": [
+      "1200 overdue since 2026-06-29",
+      "Tone \"friendly\" matched to history (avg 3.5d late, trend stable)"
+    ],
+    "evidence": [
+      {
+        "label": "Invoice INV-2008"
+      },
+      {
+        "label": "Companies House: DANA RETAIL LIMITED",
+        "url": "https://find-and-update.company-information.service.gov.uk/company/14630315"
+      },
+      {
+        "label": "Filing: 2026-03-03 Confirmation statement with no updates — 2026-02-1",
+        "url": "https://find-and-update.company-information.service.gov.uk/company/14630315/filing-history/MzUwODE4OTQwM2FkaXF6a2N4/document?format=pdf&download=0"
+      },
+      {
+        "label": "Filing: 2025-11-04 Accounts with accounts type micro entity — 2025-02",
+        "url": "https://find-and-update.company-information.service.gov.uk/company/14630315/filing-history/MzQ4NzM3NTA1OGFkaXF6a2N4/document?format=pdf&download=0"
+      }
+    ]
+  },
+  "inputs": {
+    "series": [
+      {
+        "id": "payment-lateness",
+        "title": "Days late per settled invoice",
+        "unit": "days",
+        "kind": "bar",
+        "baseline": 0,
+        "points": [
+          {
+            "date": "2026-04-28",
+            "value": 3,
+            "label": "INV-2006"
+          },
+          {
+            "date": "2026-05-29",
+            "value": 4,
+            "label": "INV-2007"
+          }
+        ]
+      },
+      {
+        "id": "order-values",
+        "title": "Order value per invoice",
+        "unit": "currency",
+        "kind": "line",
+        "points": [
+          {
+            "date": "2026-04-05",
+            "value": 700,
+            "label": "INV-2006"
+          },
+          {
+            "date": "2026-05-05",
+            "value": 700,
+            "label": "INV-2007"
+          },
+          {
+            "date": "2026-06-09",
+            "value": 1200,
+            "label": "INV-2008"
+          }
+        ]
+      }
+    ],
+    "metrics": [
+      {
+        "label": "Avg days late",
+        "value": "3.5d (stable)",
+        "tone": "neutral"
+      },
+      {
+        "label": "Order cadence",
+        "value": "every ~33d · repeat",
+        "tone": "good"
+      },
+      {
+        "label": "Last order",
+        "value": "25d ago",
+        "tone": "neutral"
+      },
+      {
+        "label": "Churn score",
+        "value": "0.13",
+        "tone": "good"
+      },
+      {
+        "label": "Overdue balance",
+        "value": "1200",
+        "tone": "bad"
+      }
+    ]
+  },
+  "result": {
+    "executedAt": "2026-07-04T19:40:54.673Z",
+    "emailDraft": {
+      "subject": "Reminder: invoice INV-2008 — 1200",
+      "body": "Hi Dana Retail Ltd,\n\nThis is a friendly reminder that invoice INV-2008 for 1200 was due on 2026-06-29 (now 5 days overdue).\n\nIf you've already sent payment, thank you and please ignore this note. Otherwise, we'd appreciate settlement at your earliest convenience, or a quick reply if anything's holding it up.\n\nMany thanks,\nAccounts, our team",
+      "generatedBy": "template"
+    },
+    "note": "Email drafted — send it from your mail client"
+  },
+  "autoExecuted": true
+}

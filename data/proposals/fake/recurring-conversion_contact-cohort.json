@@ -1,0 +1,132 @@
+{
+  "id": "recurring-conversion:contact-cohort",
+  "signalId": "recurring-conversion:contact-cohort",
+  "status": "proposed",
+  "createdAt": "2026-07-04T19:40:54.666Z",
+  "updatedAt": "2026-07-04T19:43:52.717Z",
+  "snapshotAsOf": "2026-07-04",
+  "signalFingerprint": "s7b8fk",
+  "title": "Casey Trajectory Ltd buys SVC-D every ~36.67d — convert to recurring",
+  "category": "revenue-growth",
+  "severity": "medium",
+  "contactId": "contact-cohort",
+  "contactName": "Casey Trajectory Ltd",
+  "action": {
+    "kind": "convert-recurring",
+    "contactId": "contact-cohort",
+    "itemCode": "SVC-D"
+  },
+  "prepared": {
+    "contactId": "contact-cohort",
+    "reference": "Convert to recurring order",
+    "summary": "Convert to recurring order",
+    "lineItems": [
+      {
+        "description": "Service",
+        "quantity": 1,
+        "unitAmount": 1300,
+        "lineAmount": 1300,
+        "accountCode": "200",
+        "itemCode": "SVC-D"
+      }
+    ]
+  },
+  "reasoning": {
+    "decision": "schedule",
+    "decisionReasoning": "4 orders of SVC-D at a ~36.67-day cadence. A recurring quote/invoice locks in the revenue and saves both sides admin. Policy: medium revenue-growth → schedule.",
+    "decidedBy": "rules",
+    "priority": 20,
+    "signalReasoning": [
+      "4 orders of SVC-D at a ~36.67-day cadence",
+      "A recurring quote/invoice locks in the revenue and saves both sides admin"
+    ],
+    "evidence": [
+      {
+        "label": "4 orders, last 2026-05-10"
+      }
+    ]
+  },
+  "inputs": {
+    "series": [
+      {
+        "id": "payment-lateness",
+        "title": "Days late per settled invoice",
+        "unit": "days",
+        "kind": "bar",
+        "baseline": 0,
+        "points": [
+          {
+            "date": "2026-02-11",
+            "value": 2,
+            "label": "INV-2023"
+          },
+          {
+            "date": "2026-03-16",
+            "value": 5,
+            "label": "INV-2024"
+          },
+          {
+            "date": "2026-04-19",
+            "value": 9,
+            "label": "INV-2025"
+          },
+          {
+            "date": "2026-06-13",
+            "value": 14,
+            "label": "INV-2026"
+          }
+        ]
+      },
+      {
+        "id": "order-values",
+        "title": "Order value per invoice",
+        "unit": "currency",
+        "kind": "line",
+        "points": [
+          {
+            "date": "2026-01-20",
+            "value": 1300,
+            "label": "INV-2023"
+          },
+          {
+            "date": "2026-02-19",
+            "value": 1300,
+            "label": "INV-2024"
+          },
+          {
+            "date": "2026-03-21",
+            "value": 1300,
+            "label": "INV-2025"
+          },
+          {
+            "date": "2026-05-10",
+            "value": 1300,
+            "label": "INV-2026"
+          }
+        ]
+      }
+    ],
+    "metrics": [
+      {
+        "label": "Avg days late",
+        "value": "7.5d (worsening)",
+        "tone": "bad"
+      },
+      {
+        "label": "Order cadence",
+        "value": "every ~37d · repeat",
+        "tone": "good"
+      },
+      {
+        "label": "Last order",
+        "value": "55d ago",
+        "tone": "neutral"
+      },
+      {
+        "label": "Churn score",
+        "value": "0.28",
+        "tone": "good"
+      }
+    ]
+  }
+}

@@ -5,7 +5,12 @@ export * from "./domain/company.js";
 
 // Ports
 export type { XeroPort } from "./ports/xero-port.js";
-export type { CompanyIntelPort, NewsPort } from "./ports/company-intel-port.js";
+export type {
+  CompanyIntelPort,
+  CompanyLookupResult,
+  GazettePort,
+  NewsPort,
+} from "./ports/company-intel-port.js";
 
 // Analysis
 export * from "./analysis/util.js";
@@ -15,6 +20,7 @@ export * from "./analysis/slip-risk.js";
 export * from "./analysis/recoverable.js";
 export * from "./analysis/churn.js";
 export * from "./analysis/report.js";
+export * from "./analysis/series.js";
 
 // Signals
 export * from "./signals/types.js";

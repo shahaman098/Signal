@@ -1,5 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
 import type { Contact, Invoice, SlipRisk } from "@signal/core";
+import type { GeminiClient } from "./gemini.js";
 
 export interface ChaseEmailInput {
   contact: Contact;
@@ -13,52 +13,68 @@ export interface ChaseEmailInput {
 export interface ChaseEmailDraft {
   subject: string;
   body: string;
-  generatedBy: "claude" | "template";
+  generatedBy: "gemini" | "template";
 }
+
+const DRAFT_SCHEMA = {
+  type: "object",
+  properties: {
+    subject: { type: "string" },
+    body: { type: "string" },
+  },
+  required: ["subject", "body"],
+} as const;
 
 /**
  * Drafts a payment-chase email. Chase emails are NOT a Xero object — they're
- * drafted here and sent by whatever outbound channel the app wires up. When an
- * Anthropic API key is present we let Claude write it; otherwise we fall back to
- * a deterministic template so the endpoint always works (and tests stay offline).
+ * drafted here and sent by whatever outbound channel the app wires up. With a
+ * Gemini key configured the model writes it; otherwise a deterministic template
+ * keeps the endpoint working (and tests offline).
  */
-export class ChaseEmailDrafter {
-  private client?: Anthropic;
+export interface OwnerVoice {
+  name: string;
+  business: string;
+  /** Free-text style hint, e.g. "warm but direct, no corporate filler". */
+  style: string;
+}
 
+export class ChaseEmailDrafter {
   constructor(
-    private readonly apiKey: string,
-    private readonly model: string,
-  ) {
-    if (apiKey) this.client = new Anthropic({ apiKey });
-  }
+    private readonly llm: GeminiClient,
+    private readonly owner: OwnerVoice = { name: "Accounts", business: "our team", style: "" },
+  ) {}
 
   async draft(input: ChaseEmailInput): Promise<ChaseEmailDraft> {
-    if (!this.client) return this.template(input);
-
-    const prompt = this.buildPrompt(input);
-    const message = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 700,
+    // Owner voice: explicit input wins, otherwise the configured identity.
+    const voiced: ChaseEmailInput = {
+      senderName: this.owner.name,
+      companyName: this.owner.business,
+      ...input,
+    };
+    const styleLine = this.owner.style
+      ? ` Write in the owner's voice: ${this.owner.style}.`
+      : "";
+    const text = await this.llm.complete({
       system:
-        "You draft concise, professional accounts-receivable chase emails for a small business. " +
-        "Return ONLY a JSON object with string fields \"subject\" and \"body\". No markdown, no preamble.",
-      messages: [{ role: "user", content: prompt }],
+        "You draft concise, professional accounts-receivable chase emails for a small business." +
+        styleLine +
+        ' Respond with a JSON object of string fields "subject" and "body".',
+      prompt: this.buildPrompt(voiced),
+      maxTokens: 700,
+      jsonSchema: DRAFT_SCHEMA as unknown as Record<string, unknown>,
     });
 
-    const text = message.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("");
-
-    try {
-      const parsed = JSON.parse(text) as { subject: string; body: string };
-      if (parsed.subject && parsed.body) {
-        return { subject: parsed.subject, body: parsed.body, generatedBy: "claude" };
+    if (text) {
+      try {
+        const parsed = JSON.parse(text) as { subject: string; body: string };
+        if (parsed.subject && parsed.body) {
+          return { subject: parsed.subject, body: parsed.body, generatedBy: "gemini" };
+        }
+      } catch {
+        // fall through to template on any parsing issue
       }
-    } catch {
-      // fall through to template on any parsing issue
     }
-    return this.template(input);
+    return this.template(voiced);
   }
 
   private buildPrompt(input: ChaseEmailInput): string {
