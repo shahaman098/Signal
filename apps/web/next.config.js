@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // The web app is a thin client over the Express API; nothing to proxy here,
-  // it calls NEXT_PUBLIC_API_BASE_URL directly from the browser.
+  // Browser requests are proxied through app/api so the client bundle does not
+  // depend on a build-time API origin.
 };
 
 module.exports = nextConfig;

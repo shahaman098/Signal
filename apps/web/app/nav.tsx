@@ -2,28 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Banknote, Building, Compass, FileText, House } from "./icons";
+import { House, Radar } from "./icons";
 
 /**
- * Navigation mirrors the product's pipeline, top to bottom:
- * raw evidence → per-company intelligence → money workbench → decisions.
+ * Navigation mirrors the product’s surface area: creative intelligence first.
  */
 const SECTIONS: { label?: string; links: { href: string; label: string; icon: React.ReactNode }[] }[] = [
   {
-    links: [{ href: "/", label: "Overview", icon: <House size={16} /> }],
-  },
-  {
-    label: "Intelligence",
     links: [
-      { href: "/sources", label: "Sources", icon: <FileText size={16} /> },
-      { href: "/companies", label: "Companies", icon: <Building size={16} /> },
-    ],
-  },
-  {
-    label: "Action",
-    links: [
-      { href: "/receivables", label: "Receivables", icon: <Banknote size={16} /> },
-      { href: "/plan", label: "Plan", icon: <Compass size={16} /> },
+      { href: "/", label: "Home", icon: <House size={16} /> },
+      { href: "/creative", label: "Creative Radar", icon: <Radar size={16} /> },
     ],
   },
 ];

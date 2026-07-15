@@ -1,0 +1,21 @@
+version: 1
+default: deny
+egress:
+  - name: local-dev
+    description: Local browser and service callbacks during development
+    hosts:
+      - 127.0.0.1
+      - localhost
+    ports: [3000, 4000]
+  - name: llm
+    description: Alibaba Cloud Model Studio / Qwen endpoint
+    hosts:
+      - dashscope.aliyuncs.com
+      - dashscope-intl.aliyuncs.com
+      - api.alibabacloud.com
+      # Workspace-specific Singapore endpoint used by the live Signal setup.
+      - ws-sa6mvuhwolukydvg.ap-southeast-1.maas.aliyuncs.com
+    ports: [443]
+enforcement:
+  mode: default-deny
+  block_unknown_public_egress: true

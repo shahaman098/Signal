@@ -1,320 +1,265 @@
-import { mkdtempSync } from "node:fs";
-import { readFile, readdir } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { createApp } from "./app.js";
-import { FakeXeroAdapter } from "./adapters/fake-xero.adapter.js";
-import {
-  FakeCompanyIntelAdapter,
-  FakeGazetteAdapter,
-  FakeNewsAdapter,
-} from "./adapters/fake-intel.adapter.js";
-import { GeminiClient } from "./llm/gemini.js";
 
-function makeApp() {
-  const xero = new FakeXeroAdapter();
-  const contextDir = mkdtempSync(join(tmpdir(), "signal-ctx-"));
-  const proposalsDir = mkdtempSync(join(tmpdir(), "signal-props-"));
-  const { app, services } = createApp({
-    xero,
-    intel: new FakeCompanyIntelAdapter(),
-    news: new FakeNewsAdapter(),
-    gazette: new FakeGazetteAdapter(),
-    // No API key → chase emails + agent decisions use offline fallbacks.
-    llm: new GeminiClient("", "gemini-3.5-flash"),
-    contextDir,
-    proposalsDir,
-    cacheTtlMs: 0,
-  });
-  return { app, xero, services, contextDir, proposalsDir };
+function mockCreativeBackend(overrides?: { radarMode?: "live" | "fallback"; qwen?: boolean }) {
+  process.env.CREATIVE_INTEL_API_BASE_URL = "https://creative.example";
+  process.env.CREATIVE_INTEL_BRAND_ID = "brand-live-1";
+  process.env.CREATIVE_INTEL_BRAND_NAME = "Live Brand";
+  process.env.CREATIVE_INTEL_CATEGORY = "Energy Drinks";
+  process.env.CREATIVE_INTEL_TIMEOUT_MS = "5000";
+  if (overrides?.qwen ?? true) {
+    process.env.DASHSCOPE_API_KEY = "test-dashscope-key";
+    process.env.QWEN_BASE_URL = "https://qwen.example/compatible-mode/v1";
+    process.env.QWEN_MODEL = "qwen-plus";
+  } else {
+    delete process.env.DASHSCOPE_API_KEY;
+    delete process.env.QWEN_BASE_URL;
+    delete process.env.QWEN_MODEL;
+  }
+
+  vi.stubGlobal("fetch", vi.fn(async (input: string | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url === "https://creative.example/api/v1/brands/brand-live-1/web?include_competitors=true") {
+      return new Response(
+        JSON.stringify({
+          nodes: [
+            {
+              id: "ad-1",
+              brand_id: "brand-live-1",
+              platform: "meta",
+              title: "Creator proof video with screenshot evidence",
+              health: "aging",
+              health_score: 0.64,
+              run_days: 22,
+              reach_bucket: "high",
+              variant_count: 2,
+              creative_family_id: "creator-proof",
+            },
+          ],
+          competitor_nodes: [
+            {
+              id: "comp-1",
+              brand_id: "competitor-brand",
+              platform: "meta",
+              title: "Founder voiceover comparison teardown",
+              health: "thriving",
+              health_score: 0.82,
+              run_days: 14,
+              reach_bucket: "high",
+              variant_count: 1,
+              creative_family_id: "founder-proof",
+            },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+    if (url === "https://creative.example/api/v1/brands/brand-live-1/stats") {
+      return new Response(
+        JSON.stringify({
+          total: 1,
+          health_breakdown: {
+            thriving: 0,
+            aging: 1,
+            fatiguing: 0,
+            declining: 0,
+          },
+          fatiguing_count: 0,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+    if (url === "https://qwen.example/compatible-mode/v1/chat/completions" && init?.method === "POST") {
+      const body = JSON.parse(String(init.body ?? "{}"));
+      const system = String(body.messages?.[0]?.content ?? "");
+      const content = system.includes("live creative-intelligence data collector")
+        ? {
+            brand: { name: "Live Brand", category: "Energy Drinks" },
+            owned_ads: [
+              {
+                id: "qwen-ad-1",
+                brand_id: "brand-live-1",
+                platform: "meta",
+                title: "Creator proof video with screenshot evidence",
+                health: "aging",
+                health_score: 0.64,
+                run_days: 22,
+                reach_bucket: "high",
+                variant_count: 2,
+                creative_family_id: "creator-proof",
+              },
+            ],
+            competitor_ads: [
+              {
+                id: "qwen-comp-1",
+                brand_id: "competitor-brand",
+                platform: "meta",
+                title: "Founder voiceover comparison teardown",
+                health: "thriving",
+                health_score: 0.82,
+                run_days: 14,
+                reach_bucket: "high",
+                variant_count: 1,
+                creative_family_id: "founder-proof",
+              },
+            ],
+            meta_signals: ["Qwen searched current public creative signals.", "Creator proof appears stronger than offer-led creative."],
+          }
+        : {
+            text: "Shift away from the discount loop and scale creator proof.",
+            thinking: ["Owned creatives are aging.", "Competitor proof looks stronger."],
+            widget: "creative_brief",
+            brief: {
+              title: "Creator Proof Refresh Brief",
+              narrative: "Move into faster evidence-led creative built around creator authority.",
+              metrics: [
+                { label: "Creative Opportunity Score", value: "81" },
+                { label: "Fatigue Risk Score", value: "59" },
+                { label: "Brand Fit Score", value: "76" },
+              ],
+              alerts: [
+                { level: "Saturation", text: "Discount montage is aging." },
+                { level: "Opportunity", text: "Creator proof remains healthier." },
+              ],
+              strategy: ["Retire the weakest offer-led variant.", "Launch creator-proof refreshes."],
+            },
+            suggestions: ["Show the weakest family", "Compare competitors", "Generate a refresh brief"],
+          };
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify(content),
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+    if (url === "https://creative.example/api/v1/radar/chat" && init?.method === "POST") {
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          source: "meta_ad_library",
+          mode: overrides?.radarMode ?? "live",
+          result: {
+            text: "Shift away from the discount loop and scale creator proof.",
+            thinking: ["Owned creatives are aging.", "Competitor proof looks stronger."],
+            widget: "creative_brief",
+            brief: {
+              title: "Creator Proof Refresh Brief",
+              narrative: "Move into faster evidence-led creative built around creator authority.",
+              metrics: [
+                { label: "Creative Opportunity Score", value: "81" },
+                { label: "Fatigue Risk Score", value: "59" },
+                { label: "Brand Fit Score", value: "76" },
+              ],
+              alerts: [
+                { level: "Saturation", text: "Discount montage is aging." },
+                { level: "Opportunity", text: "Creator proof remains healthier." },
+              ],
+              strategy: ["Retire the weakest offer-led variant.", "Launch creator-proof refreshes."],
+            },
+            suggestions: ["Show the weakest family", "Compare competitors", "Generate a refresh brief"],
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+    throw new Error(`Unexpected fetch in test: ${url}`);
+  }));
 }
 
-describe("API — reads & analysis", () => {
-  let app: ReturnType<typeof makeApp>["app"];
+describe("creative API", () => {
   beforeEach(() => {
-    app = makeApp().app;
+    delete process.env.NODE_ENV;
+    delete process.env.DASHSCOPE_API_KEY;
+    delete process.env.QWEN_BASE_URL;
+    delete process.env.QWEN_MODEL;
+    delete process.env.WORKSPACE_ID;
+    delete process.env.SIGNAL_TARGET_BRAND_NAME;
+    delete process.env.SIGNAL_TARGET_CATEGORY;
+    mockCreativeBackend();
   });
 
   it("GET /health", async () => {
+    const app = createApp();
     const res = await request(app).get("/health");
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ status: "ok" });
   });
 
-  it("GET /api/analytics/report returns every derivation", async () => {
-    const res = await request(app).get("/api/analytics/report");
+  it("GET /api/creative/overview", async () => {
+    const app = createApp();
+    const res = await request(app).get("/api/creative/overview");
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty("paymentPatterns");
-    expect(res.body).toHaveProperty("orderCadence");
-    expect(res.body).toHaveProperty("slipRisk");
-    expect(res.body).toHaveProperty("recoverable");
-    expect(res.body).toHaveProperty("churn");
+    expect(res.body.brand.name).toBe("Live Brand");
+    expect(res.body.ads.length).toBe(1);
+    expect(res.body.competitorAds.length).toBe(1);
   });
 
-  it("GET /api/analytics/slip-risk ranks the chronic payer highest", async () => {
-    const res = await request(app).get("/api/analytics/slip-risk");
+  it("POST /api/creative/radar", async () => {
+    const app = createApp();
+    const res = await request(app).post("/api/creative/radar").send({ prompt: "What should we test next?" });
     expect(res.status).toBe(200);
-    expect(res.body[0].contactId).toBe("contact-chronic");
-    expect(res.body[0].band).toBe("high");
+    expect(res.body.mode).toBe("live");
+    expect(res.body.result.brief.title).toBe("Creator Proof Refresh Brief");
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      "https://qwen.example/compatible-mode/v1/chat/completions",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          authorization: "Bearer test-dashscope-key",
+        }),
+      }),
+    );
   });
 
-  it("GET /api/analytics/contacts includes the enriched archetypes", async () => {
-    const res = await request(app).get("/api/analytics/contacts");
+  it("POST /api/creative/autopilot", async () => {
+    const app = createApp();
+    const res = await request(app).post("/api/creative/autopilot").send({});
     expect(res.status).toBe(200);
-    expect(res.body.length).toBe(12);
-    const ids = res.body.map((c: { contactId: string }) => c.contactId);
-    expect(ids).toContain("contact-distress");
-    expect(ids).toContain("contact-grim");
+    expect(res.body.mode).toBe("live");
+    expect(res.body.status).toBe("pending_human_review");
+    expect(res.body.recommendation.type).toBe("refresh_family");
+    expect(res.body.brief.brief.title).toBe("Creator Proof Refresh Brief");
+    expect(res.body.humanCheckpoints.length).toBeGreaterThan(0);
   });
-});
 
-describe("API — signals & company intelligence", () => {
-  it("GET /api/signals covers all five categories and prioritises distress", async () => {
-    const { app } = makeApp();
-    const res = await request(app).get("/api/signals");
+  it("runs from Qwen web-search data when no separate creative backend is configured", async () => {
+    delete process.env.CREATIVE_INTEL_API_BASE_URL;
+    delete process.env.CREATIVE_INTEL_BRAND_ID;
+    process.env.SIGNAL_TARGET_BRAND_NAME = "Live Brand";
+    process.env.SIGNAL_TARGET_CATEGORY = "Energy Drinks";
+
+    const app = createApp();
+    const res = await request(app).post("/api/creative/autopilot").send({});
+
     expect(res.status).toBe(200);
-    const { signals, countsByCategory } = res.body;
-    expect(countsByCategory["cash-recovery"]).toBeGreaterThan(0);
-    expect(countsByCategory["revenue-growth"]).toBeGreaterThan(0);
-    expect(countsByCategory["cashflow-timing"]).toBeGreaterThan(0);
-    expect(countsByCategory.strategic).toBeGreaterThan(0);
-    expect(countsByCategory.anomaly).toBeGreaterThan(0);
-    // The CH-distressed customer's collection tops the list.
-    expect(signals[0].type).toBe("distress-collection");
-    expect(signals[0].contactId).toBe("contact-distress");
+    expect(res.body.mode).toBe("live");
+    expect(res.body.status).toBe("pending_human_review");
+    expect(res.body.evidence.metaSignals[0]).toContain("Qwen searched");
   });
 
-  it("filters by ?category=", async () => {
-    const { app } = makeApp();
-    const res = await request(app).get("/api/signals?category=anomaly");
-    expect(res.status).toBe(200);
-    expect(res.body.signals.length).toBeGreaterThan(0);
-    for (const s of res.body.signals) expect(s.category).toBe("anomaly");
+  it("rejects fallback radar output from the upstream backend", async () => {
+    mockCreativeBackend({ radarMode: "fallback", qwen: false });
+    const app = createApp();
+    const res = await request(app).post("/api/creative/radar").send({ prompt: "What should we test next?" });
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe("CreativeUpstreamError");
+    expect(res.body.message).toContain("fallback output");
   });
 
-  it("ingestion writes one context JSON file per company", async () => {
-    const { app, contextDir } = makeApp();
-    const res = await request(app).post("/api/context/refresh");
-    expect(res.status).toBe(200);
-    expect(res.body.updated).toBe(12);
-    const files = (await readdir(contextDir)).filter((f) => f.endsWith(".json"));
-    expect(files.length).toBe(12);
-    // Spot-check the distressed customer's file: CH flags + filing PDF + news link.
-    const dana = JSON.parse(await readFile(join(contextDir, "contact-distress.json"), "utf8"));
-    expect(dana.companiesHouse.flags).toContain("gazette-strike-off-notice");
-    expect(dana.companiesHouse.filings[0].pdfUrl).toMatch(/company-information\.service\.gov\.uk/);
-    expect(dana.news[0].url).toMatch(/^https:\/\//);
-    expect(dana.news[0].sentiment).toBe("negative");
-  });
-
-  it("GET /api/context/:contactId serves the full company document", async () => {
-    const { app } = makeApp();
-    await request(app).post("/api/context/refresh");
-    const res = await request(app).get("/api/context/contact-goodnews");
-    expect(res.status).toBe(200);
-    expect(res.body.companyName).toBe("Grow Fast Ltd");
-    expect(res.body.news[0].title).toMatch(/£2m seed round/);
-  });
-
-  it("GET /api/context/:contactId 404s for unknown companies", async () => {
-    const { app } = makeApp();
-    const res = await request(app).get("/api/context/nope");
-    expect(res.status).toBe(404);
-  });
-});
-
-describe("API — sources & company briefs", () => {
-  it("GET /api/sources returns the unified evidence feed, newest first", async () => {
-    const { app } = makeApp();
-    const res = await request(app).get("/api/sources");
-    expect(res.status).toBe(200);
-    const items = res.body as { type: string; date: string; companyName: string; url?: string }[];
-    expect(items.length).toBeGreaterThan(3);
-    // Contains all three evidence types from the fake intel
-    const types = new Set(items.map((i) => i.type));
-    expect(types.has("news")).toBe(true);
-    expect(types.has("gazette")).toBe(true);
-    expect(types.has("filing")).toBe(true);
-    // Sorted newest-first
-    for (let i = 1; i < items.length; i++) {
-      expect(items[i - 1]!.date >= items[i]!.date).toBe(true);
-    }
-  });
-
-  it("GET /api/companies/:id/brief composes the dossier from real data", async () => {
-    const { app } = makeApp();
-    const res = await request(app).get("/api/companies/contact-distress/brief");
-    expect(res.status).toBe(200);
-    const b = res.body;
-    expect(b.briefBy).toBe("rules"); // offline
-    expect(b.brief).toMatch(/Dana Retail/);
-    expect(b.brief).toMatch(/accounts-overdue/); // flags surfaced
-    expect(b.brief).toMatch(/Gazette notice/);
-    expect(b.metrics.length).toBeGreaterThan(0);
-    expect(b.signals.some((s: { type: string }) => s.type === "distress-collection")).toBe(true);
-    expect(b.evidence.some((e: { type: string }) => e.type === "gazette")).toBe(true);
-  });
-
-  it("brief 404s for unknown companies", async () => {
-    const { app } = makeApp();
-    const res = await request(app).get("/api/companies/nope/brief");
-    expect(res.status).toBe(404);
-  });
-});
-
-describe("API — measure & interrogate", () => {
-  it("GET /api/impact starts at zero and counts executed actions", async () => {
-    const { app } = makeApp();
-    const before = await request(app).get("/api/impact");
-    expect(before.status).toBe(200);
-    expect(before.body.totalUnlocked).toBe(0);
-
-    // Generate (auto-executes chase drafts) then approve a quote proposal.
-    await request(app).post("/api/proposals/generate");
-    const proposals = (await request(app).get("/api/proposals")).body as {
-      id: string;
-      status: string;
-      prepared?: { lineItems: { lineAmount: number }[] };
-    }[];
-    const quote = proposals.find((p) => p.status === "proposed" && p.prepared)!;
-    await request(app).post(`/api/proposals/${encodeURIComponent(quote.id)}/approve`);
-
-    const after = await request(app).get("/api/impact");
-    expect(after.body.actionsExecuted).toBeGreaterThan(0);
-    expect(after.body.emailsDrafted).toBeGreaterThan(0);
-    expect(after.body.quotesCreated).toBe(1);
-    const quoteValue = quote.prepared!.lineItems.reduce((s, li) => s + li.lineAmount, 0);
-    expect(after.body.pipelineCreated).toBe(quoteValue);
-    expect(after.body.totalUnlocked).toBeGreaterThanOrEqual(quoteValue);
-  });
-
-  it("counts REAL cash recovery when a chased invoice's balance drops in Xero", async () => {
-    const { app, xero } = makeApp();
-    await request(app).post("/api/proposals/generate");
-
-    // Find an auto-executed chase and pay its invoice down in the (fake) ledger.
-    const proposals = (await request(app).get("/api/proposals")).body as {
-      status: string;
-      invoiceId?: string;
-      action: { kind: string };
-      result?: { amountDueAtExecution?: number };
-    }[];
-    const chase = proposals.find((p) => p.action.kind === "chase-email" && p.status === "executed")!;
-    expect(chase.result?.amountDueAtExecution).toBeGreaterThan(0);
-
-    const snapshot = await xero.snapshot();
-    const invoice = snapshot.invoices.find((i) => i.invoiceId === chase.invoiceId)!;
-    const paid = invoice.amountDue;
-    invoice.amountPaid += paid;
-    invoice.amountDue = 0; // customer paid after the chase
-
-    const impact = await request(app).get("/api/impact");
-    expect(impact.body.cashRecovered).toBe(paid);
-  });
-
-  it("POST /api/ask answers grounded questions offline with real numbers", async () => {
-    const { app } = makeApp();
-    const res = await request(app).post("/api/ask").send({ question: "How much is overdue right now?" });
-    expect(res.status).toBe(200);
-    expect(res.body.answeredBy).toBe("offline");
-    expect(res.body.answer).toMatch(/overdue/i);
-    expect(res.body.answer).toMatch(/\d/); // contains actual figures
-  });
-
-  it("POST /api/ask validates input", async () => {
-    const { app } = makeApp();
-    const res = await request(app).post("/api/ask").send({});
-    expect(res.status).toBe(400);
-  });
-});
-
-describe("API — agent decisions", () => {
-  it("POST /api/agent/decide returns prioritised decisions with reasoning", async () => {
-    const { app } = makeApp();
-    const res = await request(app).post("/api/agent/decide");
-    expect(res.status).toBe(200);
-    const { decisions, decidedBy } = res.body;
-    expect(decidedBy).toBe("rules"); // offline fallback
-    expect(decisions.length).toBeGreaterThan(10);
-    // Distress collection is decided first and acted on now.
-    expect(decisions[0].signalId).toMatch(/^distress-collection/);
-    expect(decisions[0].decision).toBe("act-now");
-    expect(decisions[0].reasoning).toMatch(/gazette-strike-off-notice/);
-    // Every decision carries a concrete action and reasoning.
-    for (const d of decisions) {
-      expect(d.action.kind).toBeTruthy();
-      expect(d.reasoning.length).toBeGreaterThan(10);
-    }
-  });
-});
-
-describe("API — writes & actions", () => {
-  it("POST /api/actions/quotes creates a quote and records it", async () => {
-    const { app, xero } = makeApp();
-    const res = await request(app)
-      .post("/api/actions/quotes")
-      .send({
-        contactId: "contact-lapsed",
-        reference: "Reactivation",
-        lineItems: [{ description: "Welcome back", quantity: 1, unitAmount: 500, lineAmount: 500 }],
-      });
-    expect(res.status).toBe(201);
-    expect(res.body.quoteId).toBeTruthy();
-    expect(res.body.deepLink).toMatch(/^https:\/\/go\.xero\.com\//);
-    expect(xero.created.quotes).toHaveLength(1);
-  });
-
-  it("POST /api/actions/quotes rejects invalid payloads", async () => {
-    const { app } = makeApp();
-    const res = await request(app).post("/api/actions/quotes").send({ contactId: "" });
-    expect(res.status).toBe(400);
-    expect(res.body.error).toBe("ValidationError");
-  });
-
-  it("POST /api/actions/invoices/draft creates a draft", async () => {
-    const { app, xero } = makeApp();
-    const res = await request(app)
-      .post("/api/actions/invoices/draft")
-      .send({
-        contactId: "contact-new",
-        lineItems: [{ description: "Service", quantity: 1, unitAmount: 100, lineAmount: 100 }],
-      });
-    expect(res.status).toBe(201);
-    expect(xero.created.invoiceDrafts).toHaveLength(1);
-  });
-
-  it("POST /api/actions/payments records a payment", async () => {
-    const { app, xero } = makeApp();
-    const res = await request(app)
-      .post("/api/actions/payments")
-      .send({ invoiceId: "inv-1", accountId: "acc-1", date: "2026-07-04", amount: 250 });
-    expect(res.status).toBe(201);
-    expect(xero.created.payments).toHaveLength(1);
-  });
-
-  it("GET /api/actions/reactivation-proposals targets churn-risk customers", async () => {
-    const { app } = makeApp();
-    const res = await request(app).get("/api/actions/reactivation-proposals");
-    expect(res.status).toBe(200);
-    expect(res.body.length).toBeGreaterThan(0);
-    expect(res.body.map((p: { contactId: string }) => p.contactId)).toContain("contact-lapsed");
-    expect(res.body[0].quote.lineItems.length).toBeGreaterThan(0);
-  });
-
-  it("POST /api/actions/invoices/:id/chase-email drafts an email (template fallback)", async () => {
-    const { app } = makeApp();
-    const res = await request(app).post("/api/actions/invoices/inv-12/chase-email").send({ tone: "firm" });
-    expect(res.status).toBe(200);
-    expect(res.body.generatedBy).toBe("template");
-    expect(res.body.subject).toMatch(/invoice/i);
-    expect(res.body.body).toContain("Chronic Chris Co");
-  });
-
-  it("chase-email 404s for an unknown invoice", async () => {
-    const { app } = makeApp();
-    const res = await request(app).post("/api/actions/invoices/does-not-exist/chase-email").send({});
-    expect(res.status).toBe(404);
+  it("rejects localhost upstream configuration in production mode", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.CREATIVE_INTEL_API_BASE_URL = "http://127.0.0.1:8000";
+    const app = createApp();
+    const res = await request(app).get("/api/creative/overview");
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe("CreativeNotConfigured");
+    expect(res.body.message).toContain("real remote backend");
   });
 });

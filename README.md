@@ -1,148 +1,152 @@
-# Signal - Xero Intelligence
+# Signal
 
-Reads accounting data from **Xero (via MCP)** and company intelligence from
-**Companies House + financial news**, derives a full signal taxonomy, and lets an
-**agent decide how to act** — writing quotes, draft invoices and payments back to Xero.
-Chase emails are drafted by Claude and returned to the caller (they are *not* a Xero object).
+Signal is a creative intelligence dashboard for marketing teams that need faster decisions on what creative to refresh, retire, or scale next. It ingests live owned and competitor ad nodes from either a configured creative intelligence backend or Qwen Model Studio web search, scores fatigue and pattern saturation, and turns that evidence into an operator-reviewed Qwen brief through Alibaba Cloud Model Studio.
 
-```
-┌─────────────┐  HTTP   ┌──────────────────────────┐  XeroPort          ┌──────────────┐
-│  apps/web   │ ──────▶ │        apps/api          │ ─────────────────▶ │  Xero (MCP)  │
-│  Next.js    │         │  Express + services      │  CompanyIntelPort  ├──────────────┤
-│  dashboard  │ ◀────── │  ingestion · signals     │ ─────────────────▶ │ Companies    │
-└─────────────┘         │  agent · actions         │  NewsPort          │ House + News │
-                        └───────────┬──────────────┘ ─────────────────▶ └──────────────┘
-                                    │ depends on              │
-                                    ▼                         ▼
-                        ┌──────────────────────┐   data/company-context/*.json
-                        │    packages/core     │   one context file per company:
-                        │  domain + analysis   │   CH data (filing PDFs linked),
-                        │  + signal engine     │   news (source links), role
-                        └──────────────────────┘
-```
+The product is built for the Global AI Hackathon Series with Qwen Cloud, Track 4: Autopilot Agent. The automation is intentional: live signals are collected and summarized automatically, while a human approval gate stays in front of production handoff.
 
-## Layout
+## What Signal Does
 
-| Path | What it is |
-| --- | --- |
-| `packages/core` | Framework-free domain model, Zod schemas, ports (`XeroPort`, `CompanyIntelPort`, `NewsPort`), the **analysis layer** and the **signal engine** — all pure functions. |
-| `apps/api` | Express server: adapters, ingestion, signals, agent decisions, write actions. |
-| `apps/api/src/adapters` | `XeroMcpAdapter` (Xero over MCP), `CompaniesHouseAdapter` (REST + **streaming**), `NewsApiAdapter`, plus deterministic fakes for all three. |
-| `apps/web` | Next.js dashboard: KPIs, agent decisions, signals by category, chase-email drafting. |
-| `data/company-context/` | One JSON file per company — the agent's full purchaser/supplier dossier. |
+- Scores owned creative inventory for health, fatigue, and family-level weakness.
+- Compares owned creative against competitor creative patterns and winning hooks.
+- Builds grounded Qwen prompts from live portfolio signals instead of demo fixtures.
+- Calls Qwen through Alibaba Cloud Model Studio's OpenAI-compatible API when `DASHSCOPE_API_KEY` is configured.
+- Uses Qwen web search for live public creative signals when no separate creative backend is configured.
+- Generates a structured brief with narrative, metrics, alerts, and next-step strategy.
+- Runs an explicit `Autopilot Agent` flow that returns a recommended action, evidence, and checkpoints.
+- Forces a human checkpoint before the brief is handed off to a creative team.
+- Includes an optional MCP service that can expose Signal creative tools to Alibaba Cloud Managed Agents.
 
-Ports-and-adapters throughout: every external system sits behind a port defined in
-core, and each has a fake — the entire test suite (56 tests) runs offline.
+## Why It Fits Track 4
 
-## Data in
+- It automates a real business workflow: creative diagnosis and refresh planning.
+- It handles ambiguous natural-language prompts through the radar panel.
+- It invokes an external live backend rather than relying on static local data.
+- It exposes a distinct agent run surface through `POST /api/creative/autopilot`.
+- It includes a human-in-the-loop approval gate before downstream action.
+- It is prepared for Alibaba Cloud deployment, with a low-cost Function Compute path and an optional container path.
+- It includes an optional MCP server for Model Studio tool attachment.
 
-- **Xero (via MCP)** — invoices, contacts, payments, aged receivables, bills, suppliers.
-- **Companies House** — profile, status, distress flags (accounts overdue, gazette
-  strike-off, liquidation…), filing history with **PDF links**, plus the **real-time
-  streaming API**: registry changes for tracked companies trigger an immediate
-  context refresh (`COMPANIES_HOUSE_STREAM=true`).
-- **Financial news** — per-company headlines with source links and sentiment.
+## System Diagram
 
-Ingestion merges all of it into `data/company-context/<contactId>.json` — refreshed on
-boot, via `POST /api/context/refresh`, or by stream events.
-
-## The signal taxonomy (19 types, 5 categories)
-
-**Cash recovery** (`signals/cash-recovery.ts`)
-- `overdue-chase` — chase email, tone-matched to the customer's payment history
-- `slip-risk-escalation` — worsening pattern → firmer chase, prioritised now
-- `distress-collection` — CH-flagged customer → urgent collection **before** terms; never a payment plan
-- `partial-payment-followup` — short payment → chase the balance
-- `chronic-payer-soft-nudge` — always late but always pays → soft nudge + suggest upfront terms
-
-**Revenue growth** (`signals/revenue-growth.ts`)
-- `recurring-conversion` — repeat same-item buyer → recurring quote/invoice
-- `reactivation-offer` — lapsed high-value customer → drafted quote
-- `shrinking-basket-winback` — order value declining each cycle → early win-back
-- `cross-sell` — buys line A, fits the profile of line-B buyers
-- `good-news-upsell` — funding/expansion news → timed upsell (source cited)
-
-**Cash flow timing** (`signals/cashflow-timing.ts`)
-- `bills-vs-receivables` — defer some, pay others, stay cash-positive
-- `early-payment-discount` — discount available and cash allows → flagged saving
-- `supplier-distress` — CH-flagged supplier we depend on → alternate/prepay caution
-
-**Strategic** (`signals/strategic.ts`)
-- `concentration-risk` — "X% of revenue sits with 3 clients"
-- `margin-drift` — a line's margin quietly dropping over months
-- `churn-cohort-match` — behaving like customers ~2 months before they churned
-
-**Anomaly / hygiene** (`signals/anomaly.ts`)
-- `duplicate-invoice`, `amount-anomaly`, `terms-change`
-
-Every signal carries `reasoning[]` (why it fired), `evidence[]` (CH filing PDFs, news
-links), and a `recommendedAction`.
-
-## The agent
-
-`POST /api/agent/decide` hands the prioritised signals **plus each company's context
-document** to Claude, which decides act-now / schedule / monitor / dismiss per signal
-with explicit reasoning (e.g. holds a chase because of bad press, bumps an upsell
-because funding landed). Without an API key a deterministic severity policy decides,
-so the endpoint always works. Both paths return the same shape, tagged `decidedBy`.
-
-## HTTP surface
-
-```
-GET  /api/signals[?category=]        prioritised signals
-GET  /api/signals/summary            counts by category/severity
-GET  /api/context                    all company dossiers
-GET  /api/context/:contactId         one company (CH + filings + news)
-POST /api/context/refresh            re-ingest Companies House + news
-POST /api/agent/decide               agent decisions with reasoning
-
-GET  /api/analytics/report           payment patterns, cadence, slip-risk, recoverable, churn
-POST /api/actions/quotes             create quote (reactivation flagship)
-POST /api/actions/invoices/draft     draft invoice (never auto-authorised)
-POST /api/actions/payments           create payment
-POST /api/actions/invoices/:id/chase-email   Claude-drafted chase email
-GET  /api/actions/reactivation-proposals     auto-built offers for churn risks
+```mermaid
+flowchart LR
+    operator["Creative operator"] --> web["Next.js dashboard<br/>apps/web"]
+    web --> api["Express API proxy<br/>apps/api"]
+    api --> upstream["Creative intelligence backend"]
+    api --> qwen["Qwen Model Studio<br/>OpenAI-compatible API"]
+    api --> approval["Operator approval checkpoint"]
 ```
 
-## Quick start
+More detail lives in [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+## Alibaba Cloud and Qwen Proof Path
+
+If you need one repo path for Devpost review, start with [deploy/alibaba-cloud/acs/signal-api.yaml](./deploy/alibaba-cloud/acs/signal-api.yaml).
+
+Supporting proof files:
+
+- [deploy/alibaba-cloud/function-compute/standalone-agent.py](./deploy/alibaba-cloud/function-compute/standalone-agent.py) is the deployed single-file Function Compute web runtime for the live Qwen agent.
+- [apps/api/src/services/creative-intelligence.service.ts](./apps/api/src/services/creative-intelligence.service.ts) validates live creative data and calls Qwen Model Studio directly for radar and autopilot runs.
+- [apps/mcp/src/server.ts](./apps/mcp/src/server.ts) exposes `creative_overview`, `creative_radar`, and `creative_autopilot` as MCP tools.
+- [apps/api/policy.yaml](./apps/api/policy.yaml) restricts public egress to approved local endpoints and Alibaba Cloud hosts.
+- [apps/api/Dockerfile](./apps/api/Dockerfile) packages the backend for container deployment.
+- [deploy/alibaba-cloud/terraform/main.tf](./deploy/alibaba-cloud/terraform/main.tf) documents a fuller Alibaba Cloud infrastructure path, but it is not required for the minimum Devpost submission.
+- [docs/ALIBABA_CLOUD_DEPLOYMENT.md](./docs/ALIBABA_CLOUD_DEPLOYMENT.md) documents Alibaba deployment proof options.
+- [deploy/alibaba-cloud/acs/deploy.sh](./deploy/alibaba-cloud/acs/deploy.sh) supports the container path when that is affordable.
+
+## Repo Layout
+
+- `apps/api` - Express API, live upstream proxy, route validation, deployment assets
+- `apps/mcp` - custom MCP service for Signal creative tools
+- `apps/web` - Next.js dashboard and operator review experience
+- `deploy/alibaba-cloud` - Function Compute, container, and optional Terraform templates for Alibaba Cloud
+- `deploy/alibaba-cloud/terraform` - optional Terraform stack for Alibaba network, ACK, and ACR provisioning
+- `docs` - Devpost draft copy, proof requirements, and demo materials
+
+## Local Run
 
 ```bash
 npm install
-cp .env.example .env     # all-fake adapters work with zero credentials
-npm test                 # 56 tests, fully offline
-
-npm run dev:api          # API on :4000 — ingestion primes context files on boot
-npm run dev:web          # dashboard on :3000
+cp .env.example .env
+npm test
+npm run dev:api
+npm run dev:web
 ```
 
-### Going live
+For local-only runs, keep `HOST=127.0.0.1`. For container or cloud deployment, set `HOST=0.0.0.0`.
+
+## Runtime Configuration
+
+```bash
+HOST=127.0.0.1
+PORT=4000
+API_BASE_URL=http://127.0.0.1:4000
+CREATIVE_INTEL_API_BASE_URL=https://...
+CREATIVE_INTEL_BRAND_ID=...
+CREATIVE_INTEL_BRAND_NAME=...
+CREATIVE_INTEL_CATEGORY=...
+CREATIVE_INTEL_TIMEOUT_MS=30000
+DASHSCOPE_API_KEY=...
+WORKSPACE_ID=...
+QWEN_MODEL=qwen-plus
+SIGNAL_TARGET_BRAND_NAME=Celsius
+SIGNAL_TARGET_CATEGORY=energy drinks
 ```
-XERO_ADAPTER=mcp  XERO_CLIENT_ID=…  XERO_CLIENT_SECRET=…
-COMPANIES_HOUSE_API_KEY=…   # developer.company-information.service.gov.uk
-COMPANIES_HOUSE_STREAM=true # real-time registry change stream
-NEWS_API_KEY=…              # NewsAPI.org-compatible
-ANTHROPIC_API_KEY=…         # Claude agent decisions + chase emails
+
+Notes:
+
+- `CREATIVE_INTEL_API_BASE_URL` points at the optional live creative intelligence backend.
+- `CREATIVE_INTEL_BRAND_ID` identifies the optional brand workspace to analyze.
+- `DASHSCOPE_API_KEY` enables direct Qwen Model Studio calls for `/radar` and `/autopilot`.
+- `WORKSPACE_ID` lets the API use the Singapore workspace endpoint `https://{WORKSPACE_ID}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`.
+- `SIGNAL_TARGET_BRAND_NAME` and `SIGNAL_TARGET_CATEGORY` are used by Qwen web search when no separate creative backend is configured.
+- The API exposes `GET /api/creative/overview`, `POST /api/creative/radar`, and `POST /api/creative/autopilot`.
+- When upstream or Qwen credentials are missing, the API returns an error instead of fake production content.
+- In `NODE_ENV=production`, `CREATIVE_INTEL_API_BASE_URL` must not be `localhost`, `127.0.0.1`, or another local-only hostname.
+
+## Current Readiness Status
+
+The local implementation is complete and the low-cost Alibaba Cloud Function Compute agent is live. The hackathon submission is still not complete until public Devpost proof links and the demo video are filled.
+
+- Local code and docs: implemented
+- Alibaba Cloud Function Compute agent: live verified on `2026-07-15`
+- Cloud endpoint: `https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run`
+- Hosted UI: `https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run/`
+- Proof record: [docs/proof/function-compute-live-proof.md](./docs/proof/function-compute-live-proof.md)
+- Model Studio Managed Agent creation: optional, not required for the Devpost minimum
+- Remote MCP registration: optional, not required for the Devpost minimum
+- End-to-end cloud agent session: optional, not required for the Devpost minimum
+- Demo video: not recorded in this repo yet
+
+The strict readiness definition is documented in [docs/HACKATHON_READINESS_STANDARD.md](./docs/HACKATHON_READINESS_STANDARD.md).
+
+## Submission Workbench
+
+- [docs/DEVPOST_SUBMISSION.md](./docs/DEVPOST_SUBMISSION.md) - draft project description and judging map
+- [docs/DEMO_SCRIPT.md](./docs/DEMO_SCRIPT.md) - three-minute demo outline
+- [docs/ALIBABA_CLOUD_DEPLOYMENT.md](./docs/ALIBABA_CLOUD_DEPLOYMENT.md) - deployment and proof checklist
+- [docs/MODEL_STUDIO_MANAGED_AGENT.md](./docs/MODEL_STUDIO_MANAGED_AGENT.md) - optional Managed Agent and MCP integration path
+- [docs/HACKATHON_READINESS_STANDARD.md](./docs/HACKATHON_READINESS_STANDARD.md) - strict definition of when the project can be called ready
+- [docs/HACKATHON_PROOF.md](./docs/HACKATHON_PROOF.md) - final evidence file that must be filled before submission
+- [HACKATHON_COMPLETION_CHECKLIST.md](./HACKATHON_COMPLETION_CHECKLIST.md) - remaining work before final submission
+
+## Implementation Check
+
+```bash
+npm run implementation:check
 ```
 
-**GCP note**: not required at this stage — the context store is deliberately a narrow
-3-method interface over local JSON files. If/when you want cloud storage (GCS),
-Pub/Sub-driven ingestion or BigQuery analytics, implement `ContextStore` against them;
-nothing above the interface changes. (`gcloud` is installed locally with project
-`labs-501018` if you decide to.)
+This validates the local implementation by running typecheck, tests, production builds, and an implementation artifact audit.
 
-## Tests
+## Final Submission Check
 
-- `packages/core/src/analysis/analysis.test.ts` — 17 unit tests, base four-archetype fixture.
-- `packages/core/src/signals/signals.test.ts` — 22 tests: **every signal type** has a
-  dedicated archetype in `testing/demo-enriched.ts` and an assertion.
-- `apps/api/src/app.test.ts` — 17 supertest integration tests: signals API, context-file
-  ingestion (verifies the JSON on disk, CH flags, PDF + news links), agent decisions,
-  and all write paths.
+```bash
+npm run submission:check
+```
 
-## Extending
+This must fail until [docs/HACKATHON_PROOF.md](./docs/HACKATHON_PROOF.md) has the required Devpost proof: public repo, visible license, Alibaba Cloud deployment code proof, Alibaba Cloud screenshot proof, architecture URL, demo video URL, Track 4, final description status, and required Devpost answers.
 
-- **New signal**: add a detector in `packages/core/src/signals/`, register it in
-  `engine.ts`, give it an archetype in `demo-enriched.ts`, assert it in `signals.test.ts`.
-- **New intelligence source** (credit scores, court records…): define a port in core,
-  adapt it in `apps/api/src/adapters`, merge it into `CompanyContext` in the ingestion
-  service — the agent sees it automatically.
+The submission gate rejects local-only or unverifiable required proof, including:
+
+- `localhost` or private-network proof URLs
+- placeholder required values in the proof file

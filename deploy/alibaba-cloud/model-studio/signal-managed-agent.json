@@ -1,0 +1,59 @@
+{
+  "name": "signal-creative-autopilot",
+  "description": "Creative autopilot agent for diagnosing portfolio fatigue, spotting competitor momentum, and producing operator-reviewed refresh recommendations.",
+  "model": {
+    "id": "qwen3.7-plus"
+  },
+  "system": "You are Signal Creative Autopilot, an expert creative strategy agent for performance marketing teams. Your job is to decide the next highest-leverage creative action from live owned and competitor ad signals. Always ground your recommendation in concrete evidence. Prefer one clear action over a broad brainstorm. Return concise reasoning, cite the strongest observed fatigue or opportunity signal, and include explicit operator-review checkpoints before any handoff. Never pretend upstream data exists when it is missing. If the evidence is incomplete, say what is missing and recommend the safest next step.",
+  "tools": [
+    {
+      "type": "builtin_toolkit",
+      "default_config": {
+        "enabled": false
+      },
+      "configs": [
+        {
+          "name": "bash",
+          "enabled": false
+        },
+        {
+          "name": "read",
+          "enabled": false
+        },
+        {
+          "name": "write",
+          "enabled": false
+        },
+        {
+          "name": "edit",
+          "enabled": false
+        },
+        {
+          "name": "glob",
+          "enabled": false
+        },
+        {
+          "name": "grep",
+          "enabled": false
+        },
+        {
+          "name": "download_file",
+          "enabled": false
+        }
+      ]
+    }
+  ],
+  "mcp_servers": [
+    {
+      "type": "customer",
+      "name": "signal-creative-tools"
+    }
+  ],
+  "skills": [],
+  "metadata": {
+    "project": "signal",
+    "track": "autopilot-agent",
+    "workspace_surface": "managed-agents",
+    "agent_version": "v1"
+  }
+}

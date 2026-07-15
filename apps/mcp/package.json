@@ -1,0 +1,21 @@
+{
+  "name": "@signal/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "dev:http": "tsx watch src/http.ts",
+    "build": "tsc -b",
+    "start": "node dist/server.js",
+    "start:http": "node dist/http.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsx": "^4.16.2"
+  }
+}

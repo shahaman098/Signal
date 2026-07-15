@@ -7,9 +7,8 @@ import "./globals.css";
 const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 export const metadata: Metadata = {
-  title: "Signal — Xero Intelligence",
-  description:
-    "Signals, company intelligence and human-approved actions over Xero, Companies House and financial news.",
+  title: "Signal — Creative Intelligence",
+  description: "Live creative intelligence over the upstream ad-radar backend, with Qwen-driven analysis.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -22,13 +21,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <div className="brand-mark">S</div>
               <div>
                 <div className="brand-name">Signal</div>
-                <div className="brand-tag">Xero intelligence</div>
+                <div className="brand-tag">Creative intelligence</div>
               </div>
             </div>
             <Nav />
-            <div className="sidebar-foot">
-              Xero · Companies House · Gazette · News
-            </div>
+            <div className="sidebar-foot">Creative radar · live backend</div>
           </aside>
           <main className="content">
             <div className="content-inner">{children}</div>

@@ -2,16 +2,19 @@
   "name": "signal",
   "private": true,
   "version": "0.1.0",
-  "description": "Xero receivables intelligence — reads via MCP, derives payment/churn signals, writes quotes/invoices/payments back to Xero",
+  "description": "Creative intelligence dashboard powered by Qwen and live ad/brand data",
   "workspaces": [
-    "packages/*",
     "apps/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "implementation:check": "npm run typecheck && npm test && npm run build && node scripts/verify-implementation.mjs",
+    "submission:check": "npm run typecheck && npm test && npm run build && node scripts/verify-submission.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "dev:api": "tsx watch --env-file=.env apps/api/src/server.ts",
+    "dev:mcp": "npm run dev --workspace @signal/mcp",
+    "dev:mcp:http": "npm run dev:http --workspace @signal/mcp",
     "dev:web": "npm run dev --workspace @signal/web",
     "typecheck": "tsc -b"
   },
