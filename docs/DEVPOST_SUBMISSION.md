@@ -65,9 +65,9 @@ Signal turns live ad intelligence into operator-approved Qwen briefs for faster 
 
 ## Submission Links To Fill In
 
-- Repo URL: `REPLACE_WITH_PUBLIC_REPO_URL`
+- Repo URL: `https://github.com/shahaman098/Signal`
 - Demo Video URL: `REPLACE_WITH_PUBLIC_VIDEO_URL`
-- Proof File URL: `REPLACE_WITH_GITHUB_URL_TO_DEPLOY_YAML`
-- Architecture URL: `REPLACE_WITH_GITHUB_URL_TO_ARCHITECTURE_MD`
+- Proof File URL: `https://github.com/shahaman098/Signal/blob/main/deploy/alibaba-cloud/function-compute/standalone-agent.py`
+- Architecture URL: `https://github.com/shahaman098/Signal/blob/main/ARCHITECTURE.md`
 
 Use [docs/HACKATHON_READINESS_STANDARD.md](./HACKATHON_READINESS_STANDARD.md) and [docs/HACKATHON_PROOF.md](./HACKATHON_PROOF.md) as the final pre-submit gate.

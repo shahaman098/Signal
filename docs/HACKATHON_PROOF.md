@@ -6,11 +6,11 @@ Fill the required fields with real public links before submitting. Do not use `l
 
 ## Required Devpost Proof
 
-- Public repo URL: `REPLACE_WITH_PUBLIC_REPO_URL`
+- Public repo URL: `https://github.com/shahaman098/Signal`
 - Demo video URL: `REPLACE_WITH_PUBLIC_VIDEO_URL`
-- Architecture URL: `REPLACE_WITH_GITHUB_URL_TO_ARCHITECTURE_MD`
-- Alibaba deployment code proof URL: `REPLACE_WITH_PUBLIC_GITHUB_URL_TO_deploy/alibaba-cloud/function-compute/standalone-agent.py`
-- Alibaba deployment screenshot proof URL: `REPLACE_WITH_PUBLIC_GITHUB_URL_TO_docs/proof/function-compute-console.jpg`
+- Architecture URL: `https://github.com/shahaman098/Signal/blob/main/ARCHITECTURE.md`
+- Alibaba deployment code proof URL: `https://github.com/shahaman098/Signal/blob/main/deploy/alibaba-cloud/function-compute/standalone-agent.py`
+- Alibaba deployment screenshot proof URL: `https://github.com/shahaman098/Signal/blob/main/docs/proof/function-compute-console.jpg`
 - Track: `Track 4: Autopilot Agent`
 - Submission description status: `REPLACE_WITH_READY_OR_FINAL`
 - License status: `REPLACE_WITH_LICENSE_VISIBLE_STATUS`
