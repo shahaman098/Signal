@@ -197,7 +197,7 @@ function readEvidenceValue(markdown, label) {
 }
 
 function isNonPlaceholderValue(value) {
-  return Boolean(value) && !/REPLACE_WITH_|TODO|TBD/i.test(value);
+  return Boolean(value) && !/REPLACE_WITH_|TODO|TBD|OWNER_CONFIRMATION_REQUIRED|CONFIRMATION_REQUIRED/i.test(value);
 }
 
 function isPublicHttpUrl(value) {

@@ -157,3 +157,77 @@ export const House = ({ size = 18, style }: IconProps) => (
     <path d="M10 21v-6h4v6" />
   </svg>
 );
+
+export const Search = ({ size = 18, style }: IconProps) => (
+  <svg {...base(size)} style={style}>
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="m16 16 4.5 4.5" />
+  </svg>
+);
+
+export const Bell = ({ size = 18, style }: IconProps) => (
+  <svg {...base(size)} style={style}>
+    <path d="M7.5 18h9" />
+    <path d="M9.2 20a2.8 2.8 0 0 0 5.6 0" />
+    <path d="M18 15.5H6c1.2-1.2 1.8-3 1.8-5V9.8a4.2 4.2 0 1 1 8.4 0v.7c0 2 .6 3.8 1.8 5Z" />
+  </svg>
+);
+
+export const Bars = ({ size = 18, style }: IconProps) => (
+  <svg {...base(size)} style={style}>
+    <path d="M5 18V9" />
+    <path d="M12 18V5" />
+    <path d="M19 18V12" />
+  </svg>
+);
+
+export const Cards = ({ size = 18, style }: IconProps) => (
+  <svg {...base(size)} style={style}>
+    <rect x="3" y="4" width="8" height="7" rx="1.5" />
+    <rect x="13" y="4" width="8" height="7" rx="1.5" />
+    <rect x="3" y="13" width="8" height="7" rx="1.5" />
+    <rect x="13" y="13" width="8" height="7" rx="1.5" />
+  </svg>
+);
+
+export const Chat = ({ size = 18, style }: IconProps) => (
+  <svg {...base(size)} style={style}>
+    <path d="M5 6.5h14a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-8l-4.5 3v-3H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2Z" />
+  </svg>
+);
+
+export const Wallet = ({ size = 18, style }: IconProps) => (
+  <svg {...base(size)} style={style}>
+    <path d="M4 7.5h15a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h12" />
+    <path d="M15 12h4" />
+    <circle cx="15.5" cy="12" r=".5" fill="currentColor" />
+  </svg>
+);
+
+export const Gear = ({ size = 18, style }: IconProps) => (
+  <svg {...base(size)} style={style}>
+    <circle cx="12" cy="12" r="3.2" />
+    <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a1 1 0 0 1 0 1.4l-1.2 1.2a1 1 0 0 1-1.4 0l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a1 1 0 0 1-1 1h-1.7a1 1 0 0 1-1-1v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a1 1 0 0 1-1.4 0l-1.2-1.2a1 1 0 0 1 0-1.4l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a1 1 0 0 1-1-1v-1.7a1 1 0 0 1 1-1h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a1 1 0 0 1 0-1.4l1.2-1.2a1 1 0 0 1 1.4 0l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a1 1 0 0 1 1-1h1.7a1 1 0 0 1 1 1v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a1 1 0 0 1 1.4 0l1.2 1.2a1 1 0 0 1 0 1.4l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6h.2a1 1 0 0 1 1 1v1.7a1 1 0 0 1-1 1h-.2a1 1 0 0 0-.9.6Z" />
+  </svg>
+);
+
+export const ArrowUpRight = ({ size = 18, style }: IconProps) => (
+  <svg {...base(size)} style={style}>
+    <path d="M7 17 17 7" />
+    <path d="M9 7h8v8" />
+  </svg>
+);
+
+export const MinusCircle = ({ size = 18, style }: IconProps) => (
+  <svg {...base(size)} style={style}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 12h8" />
+  </svg>
+);
+
+export const PlusCircle = ({ size = 18, style }: IconProps) => (
+  <svg {...base(size)} style={style}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 12h8M12 8v8" />
+  </svg>
+);

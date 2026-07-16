@@ -13,19 +13,19 @@ This checklist reflects the live Devpost requirements for the **Global AI Hackat
 ## Current Honest Status
 
 - Local implementation: `DONE`
-- Hackathon submission: `NOT READY`
+- Hackathon submission: `OWNER CONFIRMATIONS REQUIRED`
 - Alibaba Cloud Function Compute agent: `LIVE VERIFIED`
-- Alibaba Cloud deployment proof: `LOCAL PROOF RECORDED`
+- Alibaba Cloud deployment proof: `PUBLIC PROOF LINKS FILLED`
 - Architecture doc: `DONE`
-- Demo video: `NOT RECORDED`
-- Public links: `NOT FILLED`
+- Demo video: `PUBLIC GITHUB RELEASE ASSET PUBLISHED`
+- Public links: `FILLED`
 
 ## Required Submission Items
 
 ### 1. Public open-source repository
 
 Status:
-- `Not complete until public GitHub URL is filled in docs/HACKATHON_PROOF.md`
+- `Complete: public GitHub URL is filled in docs/HACKATHON_PROOF.md`
 
 Required:
 - Make the repository public.
@@ -34,7 +34,7 @@ Required:
 ### 2. Proof of Alibaba Cloud deployment
 
 Status:
-- `Backend is running on Alibaba Cloud; not complete until public proof links are filled`
+- `Complete: backend is running on Alibaba Cloud and public proof links are filled`
 
 Devpost requires:
 - a URL to a code file in the repo showing Alibaba Cloud deployment/services/API usage
@@ -63,7 +63,7 @@ Use:
 ### 4. Text description
 
 Status:
-- `Draft complete; final proof links still required`
+- `Final draft complete; owner should paste into Devpost after confirming profile and eligibility answers`
 
 Use:
 - [docs/DEVPOST_SUBMISSION.md](./docs/DEVPOST_SUBMISSION.md)
@@ -71,7 +71,7 @@ Use:
 ### 5. Demo video
 
 Status:
-- `Not complete until public demo video URL is filled in docs/HACKATHON_PROOF.md`
+- `Complete for repo proof: public demo video URL is filled in docs/HACKATHON_PROOF.md`
 
 Use:
 - [docs/DEMO_SCRIPT.md](./docs/DEMO_SCRIPT.md)
@@ -80,10 +80,16 @@ Required:
 - Record about a three-minute demo.
 - Upload it publicly to YouTube, Vimeo, or Facebook Video.
 
+Current proof:
+- `https://github.com/shahaman098/Signal/releases/download/signal-demo-2026-07-15/signal-qwen-demo.mp4`
+
+Note:
+- If Devpost enforces a specific video-host field, upload the same MP4 to YouTube, Vimeo, or Facebook Video and replace the proof URL.
+
 ### 6. Devpost custom answers
 
 Status:
-- `Not complete until docs/HACKATHON_PROOF.md is filled`
+- `Not complete until owner-only profile and eligibility fields in docs/HACKATHON_PROOF.md are confirmed`
 
 Required fields include:
 - submitter type
@@ -115,12 +121,10 @@ Use them only if they are working and affordable.
 
 ## Remaining Required Actions
 
-1. Make the repo public.
-2. Push the current Alibaba proof files to the public repo.
-3. Fill [docs/HACKATHON_PROOF.md](./docs/HACKATHON_PROOF.md) with public proof links.
-4. Record and publish the demo video.
-5. Run `npm run submission:check`.
-6. Submit under Track 4 with the required Devpost answers.
+1. Confirm owner-only Devpost fields in [docs/HACKATHON_PROOF.md](./docs/HACKATHON_PROOF.md): submitter type, country of residence, learning level, age of majority, eligible jurisdiction, and sponsor employee status.
+2. If Devpost rejects GitHub release assets in the video field, upload `output/demo/signal-qwen-demo.mp4` to YouTube, Vimeo, or Facebook Video and replace the demo URL.
+3. Run `npm run submission:check`.
+4. Submit under Track 4 with the required Devpost answers.
 
 Rejected as not ready:
 

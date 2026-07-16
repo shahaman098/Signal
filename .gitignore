@@ -1,10 +1,12 @@
 node_modules/
 dist/
 .next/
+apps/*/.next*/
 *.tsbuildinfo
 .env
 .env.local
 coverage/
+output/
 .DS_Store
 .codex-*.jpg
 .playwright-mcp/

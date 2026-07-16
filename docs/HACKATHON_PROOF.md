@@ -7,26 +7,26 @@ Fill the required fields with real public links before submitting. Do not use `l
 ## Required Devpost Proof
 
 - Public repo URL: `https://github.com/shahaman098/Signal`
-- Demo video URL: `REPLACE_WITH_PUBLIC_VIDEO_URL`
+- Demo video URL: `https://github.com/shahaman098/Signal/releases/download/signal-demo-2026-07-15/signal-qwen-demo.mp4`
 - Architecture URL: `https://github.com/shahaman098/Signal/blob/main/ARCHITECTURE.md`
 - Alibaba deployment code proof URL: `https://github.com/shahaman098/Signal/blob/main/deploy/alibaba-cloud/function-compute/standalone-agent.py`
 - Alibaba deployment screenshot proof URL: `https://github.com/shahaman098/Signal/blob/main/docs/proof/function-compute-console.jpg`
 - Track: `Track 4: Autopilot Agent`
-- Submission description status: `REPLACE_WITH_READY_OR_FINAL`
-- License status: `REPLACE_WITH_LICENSE_VISIBLE_STATUS`
+- Submission description status: `Final draft ready for Devpost paste`
+- License status: `MIT license present and visible in the public repository`
 
 ## Required Devpost Answers
 
-- Submitter type: `REPLACE_WITH_INDIVIDUAL_TEAM_OR_ORGANIZATION`
-- Country of residence: `REPLACE_WITH_COUNTRY_OR_COUNTRIES`
-- Project status: `REPLACE_WITH_NEW_OR_EXISTING`
-- Project start date: `REPLACE_WITH_MM_DD_YY`
-- Pre-May-26 update explanation: `REPLACE_WITH_EXPLANATION_OR_NOT_APPLICABLE`
-- AI tools used: `REPLACE_WITH_AI_TOOLS_USED`
-- Learning level: `REPLACE_WITH_NONE_MODERATE_OR_SIGNIFICANT`
-- Age of majority check: `REPLACE_WITH_CONFIRMED`
-- Eligible jurisdiction check: `REPLACE_WITH_CONFIRMED`
-- Sponsor employee check: `REPLACE_WITH_CONFIRMED`
+- Submitter type: `OWNER_CONFIRMATION_REQUIRED`
+- Country of residence: `OWNER_CONFIRMATION_REQUIRED`
+- Project status: `New project`
+- Project start date: `07/04/26`
+- Pre-May-26 update explanation: `Not applicable; repository history starts on July 4, 2026, after the May 26, 2026 cutoff.`
+- AI tools used: `Qwen Model Studio, Qwen web search, OpenAI Codex`
+- Learning level: `OWNER_CONFIRMATION_REQUIRED`
+- Age of majority check: `OWNER_CONFIRMATION_REQUIRED`
+- Eligible jurisdiction check: `OWNER_CONFIRMATION_REQUIRED`
+- Sponsor employee check: `OWNER_CONFIRMATION_REQUIRED`
 
 ## Optional Technical Evidence
 
@@ -44,11 +44,11 @@ These fields can improve the judging story, but they are not required by the liv
 
 ## Final Minimum Checklist
 
-- [ ] Public repository is available.
-- [ ] Open-source license is visible in the repository.
-- [ ] Alibaba Cloud deployment code proof URL is public.
-- [ ] Alibaba Cloud screenshot proof URL is public.
-- [ ] Architecture diagram/document URL is public.
-- [ ] Demo video is public.
-- [ ] Devpost text description is final.
-- [ ] Track is set to `Track 4: Autopilot Agent`.
+- [x] Public repository is available.
+- [x] Open-source license is visible in the repository.
+- [x] Alibaba Cloud deployment code proof URL is public.
+- [x] Alibaba Cloud screenshot proof URL is public.
+- [x] Architecture diagram/document URL is public.
+- [x] Demo video is public.
+- [x] Devpost text description is final.
+- [x] Track is set to `Track 4: Autopilot Agent`.

@@ -106,17 +106,18 @@ Notes:
 
 ## Current Readiness Status
 
-The local implementation is complete and the low-cost Alibaba Cloud Function Compute agent is live. The hackathon submission is still not complete until public Devpost proof links and the demo video are filled.
+The local implementation is complete and the low-cost Alibaba Cloud Function Compute agent is live. Public proof links and a public demo asset are filled; final Devpost submission still requires owner-only eligibility and profile confirmations.
 
 - Local code and docs: implemented
 - Alibaba Cloud Function Compute agent: live verified on `2026-07-15`
 - Cloud endpoint: `https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run`
 - Hosted UI: `https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run/`
 - Proof record: [docs/proof/function-compute-live-proof.md](./docs/proof/function-compute-live-proof.md)
+- Demo video asset: `https://github.com/shahaman098/Signal/releases/download/signal-demo-2026-07-15/signal-qwen-demo.mp4`
 - Model Studio Managed Agent creation: optional, not required for the Devpost minimum
 - Remote MCP registration: optional, not required for the Devpost minimum
 - End-to-end cloud agent session: optional, not required for the Devpost minimum
-- Demo video: not recorded in this repo yet
+- Owner confirmations: still required for Devpost profile and eligibility answers
 
 The strict readiness definition is documented in [docs/HACKATHON_READINESS_STANDARD.md](./docs/HACKATHON_READINESS_STANDARD.md).
 

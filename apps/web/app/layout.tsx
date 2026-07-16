@@ -17,19 +17,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className={poppins.className}>
         <div className="shell">
           <aside className="sidebar">
-            <div className="brand">
-              <div className="brand-mark">S</div>
-              <div>
-                <div className="brand-name">Signal</div>
-                <div className="brand-tag">Creative intelligence</div>
-              </div>
+            <div className="rail-brand" aria-label="Signal">
+              <span />
+              <span />
             </div>
             <Nav />
-            <div className="sidebar-foot">Creative radar · live backend</div>
           </aside>
-          <main className="content">
-            <div className="content-inner">{children}</div>
-          </main>
+          <div className="workspace-shell">
+            <main className="content">
+              <div className="content-inner">{children}</div>
+            </main>
+          </div>
         </div>
       </body>
     </html>

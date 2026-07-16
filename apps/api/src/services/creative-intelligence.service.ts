@@ -208,6 +208,10 @@ interface QwenConfig {
 
 export class CreativeIntelligenceService {
   async overview(): Promise<CreativeOverview> {
+    if (this.demoMode()) {
+      return this.demoOverview();
+    }
+
     const cfg = this.config(false);
     if (!cfg) {
       const qwen = this.qwenConfig();
@@ -247,6 +251,9 @@ export class CreativeIntelligenceService {
 
   async radar(prompt: string): Promise<CreativeRadarEnvelope> {
     const overview = await this.overview();
+    if (this.demoMode()) {
+      return this.demoRadar(prompt, overview);
+    }
     return this.radarWithOverview(prompt, overview);
   }
 
@@ -257,6 +264,56 @@ export class CreativeIntelligenceService {
     const openPattern = overview.patterns.find((pattern) => pattern.status === "open") ?? null;
     const goal = `Decide the next highest-leverage creative action for ${overview.brand.name}.`;
     const missionPrompt = prompt?.trim() || buildAutopilotPrompt(overview, weakestFamily, strongestCompetitor, openPattern);
+    if (this.demoMode()) {
+      const radar = this.demoRadar(missionPrompt, overview);
+      const recommendation = buildRecommendation(weakestFamily, strongestCompetitor, openPattern, radar.result);
+      return {
+        mode: "live",
+        status: "pending_human_review",
+        goal,
+        prompt: missionPrompt,
+        recommendation,
+        evidence: {
+          weakestFamily: weakestFamily
+            ? {
+                id: weakestFamily.id,
+                label: weakestFamily.label,
+                avgHealth: weakestFamily.avgHealth,
+                adCount: weakestFamily.ads.length,
+              }
+            : null,
+          strongestCompetitor: strongestCompetitor
+            ? {
+                id: strongestCompetitor.id,
+                brand: strongestCompetitor.brand,
+                hook: strongestCompetitor.hook,
+                platform: strongestCompetitor.platform,
+                healthScore: strongestCompetitor.healthScore,
+              }
+            : null,
+          openPattern: openPattern
+            ? {
+                label: openPattern.label,
+                count: openPattern.count,
+                avgHealth: openPattern.avgHealth,
+                note: openPattern.note,
+              }
+            : null,
+          metaSignals: overview.metaSignals,
+        },
+        brief: radar.result,
+        humanCheckpoints: [
+          "Confirm the recommendation matches the brand strategy and margin profile.",
+          "Confirm the proposed hook and format fit the intended platform.",
+          "Confirm the brief is novel enough to avoid repeating fatigued creative.",
+        ],
+        nextActions: [
+          recommendation.firstMove,
+          ...radar.result.brief.strategy,
+        ],
+      };
+    }
+
     const radar = await this.radarWithOverview(missionPrompt, overview);
     const recommendation = buildRecommendation(weakestFamily, strongestCompetitor, openPattern, radar.result);
 
@@ -522,6 +579,223 @@ export class CreativeIntelligenceService {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private demoMode(): boolean {
+    return process.env.NODE_ENV !== "production" && process.env.CREATIVE_INTEL_DEMO_MODE?.trim() === "1";
+  }
+
+  private demoOverview(): CreativeOverview {
+    const ads: CreativeAdNode[] = [
+      {
+        id: "demo-owned-1",
+        brand: "Celsius",
+        scope: "owned",
+        title: "Creator proof with live product close-up",
+        platform: "meta",
+        health: "aging",
+        healthScore: 0.66,
+        runDays: 19,
+        reachBucket: "high",
+        variantCount: 3,
+        creativeFamilyId: "creator-proof",
+        familyLabel: "Creator Proof",
+        hook: "creator proof",
+        format: "UGC testimonial",
+        cta: "See it in action",
+        proofStyle: "screen-recorded proof",
+      },
+      {
+        id: "demo-owned-2",
+        brand: "Celsius",
+        scope: "owned",
+        title: "First-person energy routine",
+        platform: "tiktok",
+        health: "fatiguing",
+        healthScore: 0.53,
+        runDays: 27,
+        reachBucket: "mid",
+        variantCount: 2,
+        creativeFamilyId: "routine-energy",
+        familyLabel: "Routine Energy",
+        hook: "routine energy",
+        format: "founder voiceover",
+        cta: "Try the routine",
+        proofStyle: "before-after walk-through",
+      },
+      {
+        id: "demo-owned-3",
+        brand: "Celsius",
+        scope: "owned",
+        title: "Clean label stat card",
+        platform: "meta",
+        health: "thriving",
+        healthScore: 0.81,
+        runDays: 11,
+        reachBucket: "high",
+        variantCount: 4,
+        creativeFamilyId: "clean-label",
+        familyLabel: "Clean Label",
+        hook: "clean label",
+        format: "motion stat card",
+        cta: "Compare the ingredients",
+        proofStyle: "ingredient-led visual proof",
+      },
+      {
+        id: "demo-owned-4",
+        brand: "Celsius",
+        scope: "owned",
+        title: "Retail shelf comparison cut",
+        platform: "tiktok",
+        health: "aging",
+        healthScore: 0.61,
+        runDays: 23,
+        reachBucket: "low",
+        variantCount: 1,
+        creativeFamilyId: "shelf-proof",
+        familyLabel: "Shelf Proof",
+        hook: "shelf proof",
+        format: "comparison edit",
+        cta: "See the difference",
+        proofStyle: "side-by-side comparison",
+      },
+    ];
+
+    const competitorAds: CreativeAdNode[] = [
+      {
+        id: "demo-comp-1",
+        brand: "Ghost",
+        scope: "competitor",
+        title: "Founder reaction + product taste test",
+        platform: "meta",
+        health: "thriving",
+        healthScore: 0.84,
+        runDays: 16,
+        reachBucket: "high",
+        variantCount: 2,
+        creativeFamilyId: "founder-proof",
+        familyLabel: "Founder Proof",
+        hook: "founder proof",
+        format: "reaction video",
+        cta: "Watch the taste test",
+        proofStyle: "authentic founder story",
+      },
+      {
+        id: "demo-comp-2",
+        brand: "Alani Nu",
+        scope: "competitor",
+        title: "Routine reset with customer testimonials",
+        platform: "tiktok",
+        health: "aging",
+        healthScore: 0.69,
+        runDays: 18,
+        reachBucket: "high",
+        variantCount: 2,
+        creativeFamilyId: "routine-reset",
+        familyLabel: "Routine Reset",
+        hook: "routine reset",
+        format: "testimonial montage",
+        cta: "Reset your routine",
+        proofStyle: "social proof montage",
+      },
+      {
+        id: "demo-comp-3",
+        brand: "Bloom",
+        scope: "competitor",
+        title: "Ingredient breakdown with creator demo",
+        platform: "meta",
+        health: "thriving",
+        healthScore: 0.79,
+        runDays: 13,
+        reachBucket: "mid",
+        variantCount: 1,
+        creativeFamilyId: "ingredient-proof",
+        familyLabel: "Ingredient Proof",
+        hook: "ingredient proof",
+        format: "creator demo",
+        cta: "See the breakdown",
+        proofStyle: "ingredient-first explanation",
+      },
+    ];
+
+    const families = buildFamilies(ads);
+    const patterns = buildPatterns([...ads, ...competitorAds]);
+
+    return {
+      brand: { name: "Celsius", category: "energy drinks" },
+      stats: {
+        total: ads.length,
+        fatiguingCount: ads.filter((ad) => ad.health === "fatiguing" || ad.health === "declining").length,
+        familyCount: families.length,
+        avgHealth: average(ads.map((ad) => ad.healthScore)),
+      },
+      ads,
+      competitorAds,
+      families,
+      patterns,
+      metaSignals: buildMetaSignals(ads, competitorAds, patterns),
+    };
+  }
+
+  private demoRadar(prompt: string, overview: CreativeOverview): CreativeRadarEnvelope {
+    const weakestFamily = overview.families[0] ?? null;
+    const strongestCompetitor = [...overview.competitorAds].sort((a, b) => b.healthScore - a.healthScore)[0] ?? null;
+    const openPattern = overview.patterns.find((pattern) => pattern.status === "open") ?? null;
+
+    const strategy = [
+      weakestFamily
+        ? `Retire the weakest ${weakestFamily.label} variant and rebuild it around a tighter proof point.`
+        : "Retire the weakest creative family and rebuild around a stronger proof point.",
+      strongestCompetitor
+        ? `Counter ${strongestCompetitor.brand} with clearer product proof than ${strongestCompetitor.hook}.`
+        : "Counter the strongest observed competitor with clearer product proof.",
+      openPattern
+        ? `Explore the open pattern ${openPattern.label} before it gets saturated.`
+        : "Explore one fresh creative pattern before the market saturates it.",
+    ];
+
+    return {
+      mode: "live",
+      result: {
+        text: "The portfolio is showing fatigue in proof-led variants, so the fastest move is to refresh the weakest family with sharper product evidence.",
+        thinking: [
+          `Prompt focus: ${prompt}`,
+          weakestFamily
+            ? `${weakestFamily.label} is the weakest owned family at ${Math.round(weakestFamily.avgHealth * 100)}/100.`
+            : "No weak family detected.",
+          strongestCompetitor
+            ? `${strongestCompetitor.brand} is the strongest competitor signal with ${strongestCompetitor.hook}.`
+            : "No strong competitor signal detected.",
+        ],
+        widget: "creative_brief",
+        brief: {
+          title: "Refresh the weakest proof-led family",
+          narrative:
+            "Celsius should refresh the weakest owned family with sharper proof, cleaner visual hierarchy, and a more direct hook before launching another broad variation.",
+          metrics: [
+            { label: "Owned Families", value: String(overview.stats.familyCount) },
+            { label: "Fatiguing Ads", value: String(overview.stats.fatiguingCount) },
+            { label: "Avg Health", value: `${Math.round(overview.stats.avgHealth * 100)}/100` },
+          ],
+          alerts: [
+            {
+              level: "review",
+              text: "The weakest owned family is already drifting into fatigue.",
+            },
+            {
+              level: "opportunity",
+              text: "Competitor proof-led creatives are still winning attention.",
+            },
+          ],
+          strategy,
+        },
+        suggestions: [
+          "Rewrite the weakest variant around a proof-first hook",
+          "Produce two new refresh variants for operator review",
+          "Compare against the strongest competitor proof mechanic",
+        ],
+      },
+    };
   }
 
   private config(required = true): CreativeRemoteConfig | null {

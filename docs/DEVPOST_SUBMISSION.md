@@ -66,7 +66,7 @@ Signal turns live ad intelligence into operator-approved Qwen briefs for faster 
 ## Submission Links To Fill In
 
 - Repo URL: `https://github.com/shahaman098/Signal`
-- Demo Video URL: `REPLACE_WITH_PUBLIC_VIDEO_URL`
+- Demo Video URL: `https://github.com/shahaman098/Signal/releases/download/signal-demo-2026-07-15/signal-qwen-demo.mp4`
 - Proof File URL: `https://github.com/shahaman098/Signal/blob/main/deploy/alibaba-cloud/function-compute/standalone-agent.py`
 - Architecture URL: `https://github.com/shahaman098/Signal/blob/main/ARCHITECTURE.md`
 
