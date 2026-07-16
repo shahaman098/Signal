@@ -71,6 +71,10 @@ check(
   creativeService.includes("RADAR_RESULT_SCHEMA.parse"),
   "Creative intelligence service must validate Qwen radar JSON before returning it.",
 );
+check(
+  !/CREATIVE_INTEL_DEMO_MODE|demoMode|demoOverview|demoRadar|demo-owned|demo-comp/i.test(creativeService),
+  "Creative intelligence service must not include local demo mode or seeded creative data paths.",
+);
 
 const mcpServer = readIfPresent("apps/mcp/src/signal-mcp.ts");
 for (const toolName of ["creative_overview", "creative_radar", "creative_autopilot"]) {
@@ -111,6 +115,10 @@ const envExample = readIfPresent(".env.example");
 for (const variableName of ["SIGNAL_API_BASE_URL", "DASHSCOPE_API_KEY", "WORKSPACE_ID", "QWEN_MODEL", "AGENTSTUDIO_URL"]) {
   check(envExample.includes(`${variableName}=`), `.env.example is missing ${variableName}`);
 }
+check(
+  !envExample.includes("CREATIVE_INTEL_DEMO_MODE"),
+  ".env.example must not expose a demo-data mode.",
+);
 
 const acsSecretTemplate = readIfPresent("deploy/alibaba-cloud/acs/signal-api-secret.example.yaml");
 check(
