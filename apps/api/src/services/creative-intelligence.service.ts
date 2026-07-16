@@ -189,7 +189,7 @@ const QWEN_OVERVIEW_SCHEMA = z.object({
   }),
   owned_ads: z.array(REMOTE_NODE_SCHEMA).min(1),
   competitor_ads: z.array(REMOTE_NODE_SCHEMA).min(1),
-  meta_signals: z.array(z.string().min(1)).min(2),
+  meta_signals: z.array(z.string().min(1)).min(1),
 });
 
 interface CreativeRemoteConfig {
@@ -466,6 +466,7 @@ export class CreativeIntelligenceService {
                 "Use web search for current public evidence. Do not use examples, demo data, or invented IDs.",
                 "Return strict JSON only. Do not wrap it in markdown.",
                 "Return this shape: {\"brand\":{\"name\":\"...\",\"category\":\"...\"},\"owned_ads\":[{\"id\":\"...\",\"brand_id\":\"...\",\"platform\":\"meta|tiktok\",\"title\":\"...\",\"health\":\"thriving|aging|fatiguing|declining\",\"health_score\":0.7,\"run_days\":12,\"reach_bucket\":\"high|mid|low\",\"variant_count\":1,\"creative_family_id\":\"...\"}],\"competitor_ads\":[same shape],\"meta_signals\":[\"source-backed signal ...\"]}.",
+                "Return at least one source-backed meta signal; include multiple signals when the search evidence supports them.",
                 "Use concise source-backed titles, public competitor observations, and conservative health scores from visible recency, repetition, and saturation signals.",
               ].join(" "),
             },

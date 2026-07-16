@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { createApp } from "./app.js";
 
-function mockCreativeBackend(overrides?: { radarMode?: "live" | "fallback"; qwen?: boolean }) {
+function mockCreativeBackend(overrides?: {
+  radarMode?: "live" | "fallback";
+  qwen?: boolean;
+  metaSignals?: string[];
+}) {
   process.env.CREATIVE_INTEL_API_BASE_URL = "https://creative.example";
   process.env.CREATIVE_INTEL_BRAND_ID = "brand-live-1";
   process.env.CREATIVE_INTEL_BRAND_NAME = "Live Brand";
@@ -104,7 +108,10 @@ function mockCreativeBackend(overrides?: { radarMode?: "live" | "fallback"; qwen
                 creative_family_id: "founder-proof",
               },
             ],
-            meta_signals: ["Qwen searched current public creative signals.", "Creator proof appears stronger than offer-led creative."],
+            meta_signals: overrides?.metaSignals ?? [
+              "Qwen searched current public creative signals.",
+              "Creator proof appears stronger than offer-led creative.",
+            ],
           }
         : {
             text: "Shift away from the discount loop and scale creator proof.",
@@ -230,6 +237,7 @@ describe("creative API", () => {
   });
 
   it("runs from Qwen web-search data when no separate creative backend is configured", async () => {
+    mockCreativeBackend({ metaSignals: ["Qwen searched current public creative signals."] });
     delete process.env.CREATIVE_INTEL_API_BASE_URL;
     delete process.env.CREATIVE_INTEL_BRAND_ID;
     process.env.SIGNAL_TARGET_BRAND_NAME = "Live Brand";
