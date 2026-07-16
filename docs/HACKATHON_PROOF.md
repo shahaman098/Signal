@@ -7,7 +7,7 @@ Fill the required fields with real public links before submitting. Do not use `l
 ## Required Devpost Proof
 
 - Public repo URL: `https://github.com/shahaman098/Signal`
-- Demo video URL: `https://github.com/shahaman098/Signal/releases/download/signal-demo-2026-07-15/signal-qwen-demo.mp4`
+- Demo video URL: `REPLACE_WITH_PUBLIC_VIDEO_URL`
 - Architecture URL: `https://github.com/shahaman098/Signal/blob/main/ARCHITECTURE.md`
 - Alibaba deployment code proof URL: `https://github.com/shahaman098/Signal/blob/main/deploy/alibaba-cloud/function-compute/standalone-agent.py`
 - Alibaba deployment screenshot proof URL: `https://github.com/shahaman098/Signal/blob/main/docs/proof/function-compute-console.jpg`
@@ -49,6 +49,6 @@ These fields can improve the judging story, but they are not required by the liv
 - [x] Alibaba Cloud deployment code proof URL is public.
 - [x] Alibaba Cloud screenshot proof URL is public.
 - [x] Architecture diagram/document URL is public.
-- [x] Demo video is public.
+- [ ] Demo video is public.
 - [x] Devpost text description is final.
 - [x] Track is set to `Track 4: Autopilot Agent`.

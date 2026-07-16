@@ -17,7 +17,7 @@ This checklist reflects the live Devpost requirements for the **Global AI Hackat
 - Alibaba Cloud Function Compute agent: `LIVE VERIFIED`
 - Alibaba Cloud deployment proof: `PUBLIC PROOF LINKS FILLED`
 - Architecture doc: `DONE`
-- Demo video: `PUBLIC GITHUB RELEASE ASSET PUBLISHED`
+- Demo video: `REMOVED`
 - Public links: `FILLED`
 
 ## Required Submission Items
@@ -71,7 +71,7 @@ Use:
 ### 5. Demo video
 
 Status:
-- `Complete for repo proof: public demo video URL is filled in docs/HACKATHON_PROOF.md`
+- `Not recorded`
 
 Use:
 - [docs/DEMO_SCRIPT.md](./docs/DEMO_SCRIPT.md)
@@ -81,10 +81,7 @@ Required:
 - Upload it publicly to YouTube, Vimeo, or Facebook Video.
 
 Current proof:
-- `https://github.com/shahaman098/Signal/releases/download/signal-demo-2026-07-15/signal-qwen-demo.mp4`
-
-Note:
-- If Devpost enforces a specific video-host field, upload the same MP4 to YouTube, Vimeo, or Facebook Video and replace the proof URL.
+- `Not recorded`
 
 ### 6. Devpost custom answers
 
@@ -122,7 +119,7 @@ Use them only if they are working and affordable.
 ## Remaining Required Actions
 
 1. Confirm owner-only Devpost fields in [docs/HACKATHON_PROOF.md](./docs/HACKATHON_PROOF.md): submitter type, country of residence, learning level, age of majority, eligible jurisdiction, and sponsor employee status.
-2. If Devpost rejects GitHub release assets in the video field, upload `output/demo/signal-qwen-demo.mp4` to YouTube, Vimeo, or Facebook Video and replace the demo URL.
+2. If a demo video is required, record and publish a new public video, then replace the placeholder URL in [docs/HACKATHON_PROOF.md](./docs/HACKATHON_PROOF.md).
 3. Run `npm run submission:check`.
 4. Submit under Track 4 with the required Devpost answers.
 
