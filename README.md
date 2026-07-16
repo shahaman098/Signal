@@ -75,6 +75,8 @@ npm run dev:web
 
 For local-only runs, keep `HOST=127.0.0.1`. For container or cloud deployment, set `HOST=0.0.0.0`.
 
+Local creative endpoints require either a real creative intelligence backend or Qwen Model Studio credentials. Without those values, `/api/creative/overview`, `/api/creative/radar`, and `/api/creative/autopilot` return `503 CreativeNotConfigured` instead of serving fake data.
+
 ## Runtime Configuration
 
 ```bash
@@ -104,12 +106,33 @@ Notes:
 - When upstream or Qwen credentials are missing, the API returns an error instead of fake production content.
 - In `NODE_ENV=production`, `CREATIVE_INTEL_API_BASE_URL` must not be `localhost`, `127.0.0.1`, or another local-only hostname.
 
+## Reality Checks
+
+Use the deterministic local implementation check before changing code:
+
+```bash
+npm run implementation:check
+```
+
+Use the live cloud check to verify the deployed Alibaba Cloud Function Compute endpoint is currently calling Qwen Model Studio and returning human-reviewed agent packets:
+
+```bash
+npm run live:check
+```
+
+These checks validate different things:
+
+- `implementation:check` proves the repo builds, typechecks, tests, and has no local demo-data production path.
+- `live:check` proves the deployed endpoint is reachable and returns `mode=live`, `provider=Alibaba Cloud Model Studio`, a Qwen model name, evidence, human checkpoints, and next actions.
+- Local `.env` values are intentionally not committed. To run the local API against Qwen, set `DASHSCOPE_API_KEY`, `WORKSPACE_ID`, `QWEN_MODEL`, `SIGNAL_TARGET_BRAND_NAME`, and `SIGNAL_TARGET_CATEGORY`.
+
 ## Current Readiness Status
 
 The local implementation is complete and the low-cost Alibaba Cloud Function Compute agent is live. Public proof links are filled; the demo video is intentionally removed and final Devpost submission still requires owner-only eligibility and profile confirmations.
 
 - Local code and docs: implemented
 - Alibaba Cloud Function Compute agent: live verified on `2026-07-15`
+- Live verification command: `npm run live:check`
 - Cloud endpoint: `https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run`
 - Hosted UI: `https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run/`
 - Proof record: [docs/proof/function-compute-live-proof.md](./docs/proof/function-compute-live-proof.md)

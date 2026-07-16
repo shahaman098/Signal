@@ -7,9 +7,9 @@ Current status:
 - Overall hackathon readiness: `NOT READY`
 - Local implementation: `DONE`
 - Alibaba Cloud Function Compute agent: `LIVE VERIFIED`
-- Alibaba Cloud deployment proof: `LOCAL PROOF RECORDED`
+- Alibaba Cloud deployment proof: `PUBLIC PROOF LINKS FILLED`
 - Public demo video: `NOT RECORDED`
-- Public repository links: `NOT FILLED`
+- Public repository links: `FILLED`
 
 ## Devpost Minimum Requirements
 
@@ -73,20 +73,22 @@ npm run implementation:check
 
 Passing that command means the local code and repo artifacts are valid. It does not mean the hackathon submission is complete.
 
+Live cloud check:
+
+```bash
+npm run live:check
+```
+
+Passing that command means the deployed Alibaba Cloud Function Compute endpoint is reachable and returns live Qwen Model Studio agent packets with evidence, human checkpoints, and next actions.
+
 ## Required Before Submission
 
 These items are required before the project can be called submission-ready:
 
-1. Public GitHub repository URL is available.
-2. Open-source license is visible on the repository page.
-3. Code proof URL points to the Alibaba deployment file in the public repo.
-4. Screenshot proof URL shows the backend/project running on Alibaba Cloud.
-5. Public GitHub URL points to [docs/proof/function-compute-live-proof.md](./proof/function-compute-live-proof.md) or equivalent evidence.
-6. Architecture URL points to the public architecture document or diagram.
-7. Public demo video is recorded and uploaded.
-8. Devpost text description is final.
-9. [docs/HACKATHON_PROOF.md](./HACKATHON_PROOF.md) is filled for the required fields.
-10. `npm run submission:check` passes.
+1. Public demo video is recorded and uploaded to YouTube, Vimeo, or Facebook Video.
+2. Owner-only Devpost fields are filled: submitter type, country of residence, learning level, age of majority, eligible jurisdiction, and sponsor employee status.
+3. [docs/HACKATHON_PROOF.md](./HACKATHON_PROOF.md) is filled for every required field.
+4. `npm run submission:check` passes.
 
 ## Optional Score Boosters
 

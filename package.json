@@ -9,6 +9,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "implementation:check": "npm run typecheck && npm test && npm run build && node scripts/verify-implementation.mjs",
+    "live:check": "node scripts/verify-live.mjs",
     "submission:check": "npm run typecheck && npm test && npm run build && node scripts/verify-submission.mjs",
     "test": "vitest run",
     "test:watch": "vitest",

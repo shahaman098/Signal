@@ -16,6 +16,7 @@ This checklist reflects the live Devpost requirements for the **Global AI Hackat
 - Hackathon submission: `OWNER CONFIRMATIONS REQUIRED`
 - Alibaba Cloud Function Compute agent: `LIVE VERIFIED`
 - Alibaba Cloud deployment proof: `PUBLIC PROOF LINKS FILLED`
+- Live endpoint check: `npm run live:check`
 - Architecture doc: `DONE`
 - Demo video: `REMOVED`
 - Public links: `FILLED`

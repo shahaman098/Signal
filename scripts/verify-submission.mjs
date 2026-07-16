@@ -111,7 +111,10 @@ const publicRepoUrl = readEvidenceValue(proof, "Public repo URL:");
 check(isPublicHttpUrl(publicRepoUrl), "Public repo URL must be a real public http(s) URL, not a placeholder or localhost.");
 
 const demoVideoUrl = readEvidenceValue(proof, "Demo video URL:");
-check(isPublicHttpUrl(demoVideoUrl), "Demo video URL must be a real public http(s) URL, not a placeholder or localhost.");
+check(
+  isAllowedDemoVideoUrl(demoVideoUrl),
+  "Demo video URL must be a public YouTube, Vimeo, or Facebook Video URL, not a placeholder or localhost.",
+);
 
 const architectureUrl = readEvidenceValue(proof, "Architecture URL:");
 check(isPublicHttpUrl(architectureUrl), "Architecture URL must be a real public http(s) URL, not a placeholder or localhost.");
@@ -212,6 +215,18 @@ function isPublicHttpUrl(value) {
 
 function isRemoteServiceUrl(value) {
   return isPublicHttpUrl(value);
+}
+
+function isAllowedDemoVideoUrl(value) {
+  if (!isPublicHttpUrl(value)) return false;
+  const hostname = new URL(value).hostname.toLowerCase().replace(/^www\./, "");
+  return (
+    hostname === "youtu.be"
+    || hostname.endsWith("youtube.com")
+    || hostname.endsWith("vimeo.com")
+    || hostname.endsWith("facebook.com")
+    || hostname.endsWith("fb.watch")
+  );
 }
 
 function isLocalOrPrivateHost(hostname) {
