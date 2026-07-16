@@ -113,7 +113,7 @@ check(isPublicHttpUrl(publicRepoUrl), "Public repo URL must be a real public htt
 const demoVideoUrl = readEvidenceValue(proof, "Demo video URL:");
 check(
   isAllowedDemoVideoUrl(demoVideoUrl),
-  "Demo video URL must be a public YouTube, Vimeo, or Facebook Video URL, not a placeholder or localhost.",
+  "Demo video URL must be a public YouTube, Vimeo, Youku, or Facebook Video URL, not a placeholder or localhost.",
 );
 
 const architectureUrl = readEvidenceValue(proof, "Architecture URL:");
@@ -224,6 +224,7 @@ function isAllowedDemoVideoUrl(value) {
     hostname === "youtu.be"
     || hostname.endsWith("youtube.com")
     || hostname.endsWith("vimeo.com")
+    || hostname.endsWith("youku.com")
     || hostname.endsWith("facebook.com")
     || hostname.endsWith("fb.watch")
   );

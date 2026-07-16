@@ -8,7 +8,8 @@ Current status:
 - Local implementation: `DONE`
 - Alibaba Cloud Function Compute agent: `LIVE VERIFIED`
 - Alibaba Cloud deployment proof: `PUBLIC PROOF LINKS FILLED`
-- Public demo video: `NOT RECORDED`
+- Local demo video: `GENERATED`
+- Public demo video URL: `MISSING`
 - Public repository links: `FILLED`
 
 ## Devpost Minimum Requirements
@@ -85,7 +86,7 @@ Passing that command means the deployed Alibaba Cloud Function Compute endpoint 
 
 These items are required before the project can be called submission-ready:
 
-1. Public demo video is recorded and uploaded to YouTube, Vimeo, or Facebook Video.
+1. The generated demo video is uploaded publicly to YouTube, Vimeo, or Youku and remains under three minutes.
 2. Owner-only Devpost fields are filled: submitter type, country of residence, learning level, age of majority, eligible jurisdiction, and sponsor employee status.
 3. [docs/HACKATHON_PROOF.md](./HACKATHON_PROOF.md) is filled for every required field.
 4. `npm run submission:check` passes.

@@ -18,7 +18,8 @@ This checklist reflects the live Devpost requirements for the **Global AI Hackat
 - Alibaba Cloud deployment proof: `PUBLIC PROOF LINKS FILLED`
 - Live endpoint check: `npm run live:check`
 - Architecture doc: `DONE`
-- Demo video: `REMOVED`
+- Local demo video: `GENERATED (approximately 63 seconds)`
+- Public demo video URL: `MISSING`
 - Public links: `FILLED`
 
 ## Required Submission Items
@@ -72,17 +73,17 @@ Use:
 ### 5. Demo video
 
 Status:
-- `Not recorded`
+- `Recorded locally; public upload is still required`
 
 Use:
 - [docs/DEMO_SCRIPT.md](./docs/DEMO_SCRIPT.md)
 
 Required:
-- Record about a three-minute demo.
-- Upload it publicly to YouTube, Vimeo, or Facebook Video.
+- Keep the demonstration under three minutes.
+- Upload it publicly to YouTube, Vimeo, or Youku.
 
 Current proof:
-- `Not recorded`
+- `output/demo/signal-qwen-demo.mp4` exists locally and is intentionally ignored by Git.
 
 ### 6. Devpost custom answers
 
@@ -120,7 +121,7 @@ Use them only if they are working and affordable.
 ## Remaining Required Actions
 
 1. Confirm owner-only Devpost fields in [docs/HACKATHON_PROOF.md](./docs/HACKATHON_PROOF.md): submitter type, country of residence, learning level, age of majority, eligible jurisdiction, and sponsor employee status.
-2. If a demo video is required, record and publish a new public video, then replace the placeholder URL in [docs/HACKATHON_PROOF.md](./docs/HACKATHON_PROOF.md).
+2. Upload `output/demo/signal-qwen-demo.mp4` publicly, then replace the placeholder URL in [docs/HACKATHON_PROOF.md](./docs/HACKATHON_PROOF.md).
 3. Run `npm run submission:check`.
 4. Submit under Track 4 with the required Devpost answers.
 

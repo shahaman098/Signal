@@ -8,7 +8,7 @@ Record the current demo video locally with:
 npm run demo:record
 ```
 
-The generated MP4 is written to `output/demo/signal-qwen-demo.mp4`. Upload that file publicly to YouTube, Vimeo, or Facebook Video before running `npm run submission:check`.
+The generated MP4 is written to `output/demo/signal-qwen-demo.mp4`. Keep the final video under three minutes and upload it publicly to YouTube, Vimeo, or Youku before running `npm run submission:check`.
 
 ## 0:00 to 0:20 - Problem
 

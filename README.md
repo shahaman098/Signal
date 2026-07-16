@@ -1,176 +1,391 @@
 # Signal
 
-Signal is a creative intelligence dashboard for marketing teams that need faster decisions on what creative to refresh, retire, or scale next. It ingests live owned and competitor ad nodes from either a configured creative intelligence backend or Qwen Model Studio web search, scores fatigue and pattern saturation, and turns that evidence into an operator-reviewed Qwen brief through Alibaba Cloud Model Studio.
+**A Qwen-powered creative intelligence autopilot that turns current public market signals into an operator-reviewed creative action plan.**
 
-The product is built for the Global AI Hackathon Series with Qwen Cloud, Track 4: Autopilot Agent. The automation is intentional: live signals are collected and summarized automatically, while a human approval gate stays in front of production handoff.
+[Live Alibaba Cloud demo](https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run/) | [Architecture](./ARCHITECTURE.md) | [Cloud proof](./docs/proof/function-compute-live-proof.md) | [Devpost copy](./docs/DEVPOST_SUBMISSION.md)
+
+Signal is built for the **Global AI Hackathon Series with Qwen Cloud**, **Track 4: Autopilot Agent**. It automates the evidence-gathering and first-pass decision work behind creative refresh planning while keeping a human operator at the final approval boundary.
+
+## Submission Status
+
+Status last verified on **July 16, 2026**.
+
+| Requirement | Status | Evidence |
+| --- | --- | --- |
+| Working project | Complete | Local and deployed Qwen flows return structured agent packets |
+| Public open-source repository | Complete | [GitHub repository](https://github.com/shahaman098/Signal) and [MIT license](./LICENSE) |
+| Qwen Cloud API usage | Complete | Direct Model Studio calls in [creative-intelligence.service.ts](./apps/api/src/services/creative-intelligence.service.ts) |
+| Alibaba Cloud deployment | Live | [Function Compute endpoint](https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run/) and [deployment code](./deploy/alibaba-cloud/function-compute/standalone-agent.py) |
+| Architecture diagram | Complete | [ARCHITECTURE.md](./ARCHITECTURE.md) |
+| Text description | Complete | [Devpost submission draft](./docs/DEVPOST_SUBMISSION.md) |
+| Demo recording | Generated locally | `output/demo/signal-qwen-demo.mp4`; public video URL still required |
+| Devpost profile and eligibility answers | Pending owner | See [hackathon proof](./docs/HACKATHON_PROOF.md) |
+
+**Honest verdict:** the software and cloud proof work. The Devpost submission is **not ready to submit** until the demo is uploaded publicly and the owner-only eligibility fields are completed. `npm run submission:check` is the final gate.
+
+The official deadline is **July 20, 2026 at 2:00 PM PDT**, which is **10:00 PM BST**. Review the [official Devpost requirements](https://qwencloud-hackathon.devpost.com/) and [official rules](https://qwencloud-hackathon.devpost.com/rules) before submitting.
+
+## The Problem
+
+Growth teams repeatedly have to answer the same difficult questions:
+
+- Which creative family is losing momentum?
+- Which competitor pattern is gaining attention?
+- What should be refreshed, retired, scaled, or tested next?
+- Which recommendations are safe enough to hand to production?
+
+That work is slow when evidence is scattered across ad libraries, public campaign pages, and internal creative systems. A generic chatbot does not solve the problem because it lacks a workflow, structured evidence, and an approval boundary.
+
+Signal turns that process into an agent run.
 
 ## What Signal Does
 
-- Scores owned creative inventory for health, fatigue, and family-level weakness.
-- Compares owned creative against competitor creative patterns and winning hooks.
-- Builds grounded Qwen prompts from live portfolio signals instead of demo fixtures.
-- Calls Qwen through Alibaba Cloud Model Studio's OpenAI-compatible API when `DASHSCOPE_API_KEY` is configured.
-- Uses Qwen web search for live public creative signals when no separate creative backend is configured.
-- Generates a structured brief with narrative, metrics, alerts, and next-step strategy.
-- Runs an explicit `Autopilot Agent` flow that returns a recommended action, evidence, and checkpoints.
-- Forces a human checkpoint before the brief is handed off to a creative team.
-- Includes an optional MCP service that can expose Signal creative tools to Alibaba Cloud Managed Agents.
+1. Collects current owned and competitor creative observations from Qwen web search or an optional live creative-intelligence backend.
+2. Normalizes the results into typed creative nodes and groups them into creative families.
+3. Calculates family health, pattern saturation, weak spots, competitor momentum, and open creative territory.
+4. Builds a grounded mission for Qwen from the latest portfolio state and the operator's natural-language prompt.
+5. Produces a structured recommendation, strategy brief, evidence packet, alerts, and next actions.
+6. Returns the run as `pending_human_review` until an operator confirms brand fit, platform fit, and novelty.
 
-## Why It Fits Track 4
+The result is not merely a chat response. It is a repeatable decision packet that can be reviewed, approved, and handed to a creative team.
 
-- It automates a real business workflow: creative diagnosis and refresh planning.
-- It handles ambiguous natural-language prompts through the radar panel.
-- It invokes an external live backend rather than relying on static local data.
-- It exposes a distinct agent run surface through `POST /api/creative/autopilot`.
-- It includes a human-in-the-loop approval gate before downstream action.
-- It is prepared for Alibaba Cloud deployment, with a low-cost Function Compute path and an optional container path.
-- It includes an optional MCP server for Model Studio tool attachment.
+## Core Features
 
-## System Diagram
+| Feature | What it provides |
+| --- | --- |
+| Creative overview | Owned and competitor creative nodes, portfolio statistics, family health, and pattern status |
+| Creative Radar | Qwen-generated analysis for ambiguous questions about fatigue, competitors, and white-space |
+| Autopilot Agent | A deterministic action type plus Qwen brief, evidence, checkpoints, and next actions |
+| Human review gate | Explicit approval requirements before production handoff |
+| Qwen web search | Current public creative and competitor observations when no separate backend is configured |
+| Typed validation | Zod validation for upstream data, Qwen completions, and API inputs |
+| Fail-closed runtime | Missing credentials or non-live upstream output returns an error instead of local demo data |
+| MCP tools | `creative_overview`, `creative_radar`, and `creative_autopilot` over stdio or remote HTTP/SSE |
+| Alibaba Cloud runtime | A live low-cost Function Compute agent plus optional container and Terraform paths |
+| Automated proof checks | Separate implementation, live-cloud, and submission-readiness commands |
+
+## Why Track 4
+
+The official Track 4 brief asks for a production-oriented agent that automates a real business workflow, handles ambiguous input, invokes external tools, and includes human checkpoints.
+
+| Track 4 requirement | Signal implementation |
+| --- | --- |
+| Real business workflow | Creative diagnosis and refresh planning for growth and marketing teams |
+| End-to-end automation | Evidence collection, normalization, analysis, recommendation, and brief generation |
+| Ambiguous inputs | Operators can ask open-ended creative questions in the Radar panel |
+| External tools and services | Qwen Cloud API, Qwen web search, optional creative backend, and optional MCP service |
+| Human in the loop | Every autopilot result remains `pending_human_review` before handoff |
+| Production readiness | Timeouts, schema validation, structured errors, request IDs, security headers, and no production mock fallback |
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    operator["Creative operator"] --> web["Next.js dashboard<br/>apps/web"]
-    web --> api["Express API proxy<br/>apps/api"]
-    api --> upstream["Creative intelligence backend"]
-    api --> qwen["Qwen Model Studio<br/>OpenAI-compatible API"]
-    api --> approval["Operator approval checkpoint"]
+    operator["Marketing operator"] --> dashboard["Next.js dashboard"]
+    dashboard --> proxy["Next.js API proxy"]
+    proxy --> api["Signal Express API"]
+
+    api --> source{"Evidence source"}
+    source -->|default Qwen-only mode| search["Qwen web search"]
+    source -->|optional integration| upstream["Creative intelligence backend"]
+
+    search --> analysis["Typed creative analysis"]
+    upstream --> analysis
+    analysis --> qwen["Alibaba Cloud Model Studio / qwen-plus"]
+    qwen --> packet["Recommendation + brief + evidence + next actions"]
+    packet --> review["Human review gate"]
+    review --> handoff["Approved creative handoff"]
+
+    mcp["Signal MCP service"] --> api
+    fc["Alibaba Cloud Function Compute proof UI"] --> qwen
 ```
 
-More detail lives in [ARCHITECTURE.md](./ARCHITECTURE.md).
+The repository supports two related runtime shapes:
 
-## Alibaba Cloud and Qwen Proof Path
+- **Full application:** Next.js dashboard, Express API, and optional MCP service.
+- **Live hackathon proof:** a compact Function Compute web runtime that calls Alibaba Cloud Model Studio directly and exposes the hosted proof UI and agent endpoints.
 
-If you need one repo path for Devpost review, start with [deploy/alibaba-cloud/acs/signal-api.yaml](./deploy/alibaba-cloud/acs/signal-api.yaml).
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for trust boundaries, request flow, and deployment details.
 
-Supporting proof files:
+## Live Cloud Proof
 
-- [deploy/alibaba-cloud/function-compute/standalone-agent.py](./deploy/alibaba-cloud/function-compute/standalone-agent.py) is the deployed single-file Function Compute web runtime for the live Qwen agent.
-- [apps/api/src/services/creative-intelligence.service.ts](./apps/api/src/services/creative-intelligence.service.ts) validates live creative data and calls Qwen Model Studio directly for radar and autopilot runs.
-- [apps/mcp/src/server.ts](./apps/mcp/src/server.ts) exposes `creative_overview`, `creative_radar`, and `creative_autopilot` as MCP tools.
-- [apps/api/policy.yaml](./apps/api/policy.yaml) restricts public egress to approved local endpoints and Alibaba Cloud hosts.
-- [apps/api/Dockerfile](./apps/api/Dockerfile) packages the backend for container deployment.
-- [deploy/alibaba-cloud/terraform/main.tf](./deploy/alibaba-cloud/terraform/main.tf) documents a fuller Alibaba Cloud infrastructure path, but it is not required for the minimum Devpost submission.
-- [docs/ALIBABA_CLOUD_DEPLOYMENT.md](./docs/ALIBABA_CLOUD_DEPLOYMENT.md) documents Alibaba deployment proof options.
-- [deploy/alibaba-cloud/acs/deploy.sh](./deploy/alibaba-cloud/acs/deploy.sh) supports the container path when that is affordable.
+The public Function Compute deployment is available without authentication for judging:
 
-## Repo Layout
+- Hosted proof UI: [signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run](https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run/)
+- Health endpoint: [health](https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run/health)
+- Region: `ap-southeast-1`
+- Provider: Alibaba Cloud Model Studio
+- Model: `qwen-plus`
+- Runtime: Alibaba Cloud Function Compute
 
-- `apps/api` - Express API, live upstream proxy, route validation, deployment assets
-- `apps/mcp` - custom MCP service for Signal creative tools
-- `apps/web` - Next.js dashboard and operator review experience
-- `deploy/alibaba-cloud` - Function Compute, container, and optional Terraform templates for Alibaba Cloud
-- `deploy/alibaba-cloud/terraform` - optional Terraform stack for Alibaba network, ACK, and ACR provisioning
-- `docs` - Devpost draft copy, proof requirements, and demo materials
+### Judge Quick Test
 
-## Local Run
+1. Open the [hosted proof UI](https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run/).
+2. Click **Run Qwen Autopilot** and wait for the live web-search and model request to finish.
+3. Confirm the response reports `mode=live`, `provider=Alibaba Cloud Model Studio`, `model=qwen-plus`, and `status=pending_human_review`.
+4. Inspect the returned evidence, human checkpoints, and next actions.
 
-```bash
-npm install
-cp .env.example .env
-npm test
-npm run dev:api
-npm run dev:web
-```
+No login is required for this controlled judging endpoint. A live run can take roughly 30 to 90 seconds because it includes web search and model generation.
 
-For local-only runs, keep `HOST=127.0.0.1`. For container or cloud deployment, set `HOST=0.0.0.0`.
-
-Local creative endpoints require either a real creative intelligence backend or Qwen Model Studio credentials. Without those values, `/api/creative/overview`, `/api/creative/radar`, and `/api/creative/autopilot` return `503 CreativeNotConfigured` instead of serving fake data.
-
-## Runtime Configuration
-
-```bash
-HOST=127.0.0.1
-PORT=4000
-API_BASE_URL=http://127.0.0.1:4000
-CREATIVE_INTEL_API_BASE_URL=https://...
-CREATIVE_INTEL_BRAND_ID=...
-CREATIVE_INTEL_BRAND_NAME=...
-CREATIVE_INTEL_CATEGORY=...
-CREATIVE_INTEL_TIMEOUT_MS=30000
-DASHSCOPE_API_KEY=...
-WORKSPACE_ID=...
-QWEN_MODEL=qwen-plus
-SIGNAL_TARGET_BRAND_NAME=Celsius
-SIGNAL_TARGET_CATEGORY=energy drinks
-```
-
-Notes:
-
-- `CREATIVE_INTEL_API_BASE_URL` points at the optional live creative intelligence backend.
-- `CREATIVE_INTEL_BRAND_ID` identifies the optional brand workspace to analyze.
-- `DASHSCOPE_API_KEY` enables direct Qwen Model Studio calls for `/radar` and `/autopilot`.
-- `WORKSPACE_ID` lets the API use the Singapore workspace endpoint `https://{WORKSPACE_ID}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`.
-- `SIGNAL_TARGET_BRAND_NAME` and `SIGNAL_TARGET_CATEGORY` are used by Qwen web search when no separate creative backend is configured.
-- The API exposes `GET /api/creative/overview`, `POST /api/creative/radar`, and `POST /api/creative/autopilot`.
-- When upstream or Qwen credentials are missing, the API returns an error instead of fake production content.
-- In `NODE_ENV=production`, `CREATIVE_INTEL_API_BASE_URL` must not be `localhost`, `127.0.0.1`, or another local-only hostname.
-- Local Qwen setup steps are documented in [docs/LOCAL_QWEN_SETUP.md](./docs/LOCAL_QWEN_SETUP.md).
-
-## Reality Checks
-
-Use the deterministic local implementation check before changing code:
-
-```bash
-npm run implementation:check
-```
-
-Use the live cloud check to verify the deployed Alibaba Cloud Function Compute endpoint is currently calling Qwen Model Studio and returning human-reviewed agent packets:
+Verify it from the repository:
 
 ```bash
 npm run live:check
 ```
 
-These checks validate different things:
-
-- `implementation:check` proves the repo builds, typechecks, tests, and has no local demo-data production path.
-- `live:check` proves the deployed endpoint is reachable and returns `mode=live`, `provider=Alibaba Cloud Model Studio`, a Qwen model name, evidence, human checkpoints, and next actions.
-- Local `.env` values are intentionally not committed. To run the local API against Qwen, set `DASHSCOPE_API_KEY`, `WORKSPACE_ID`, `QWEN_MODEL`, `SIGNAL_TARGET_BRAND_NAME`, and `SIGNAL_TARGET_CATEGORY`.
-
-## Current Readiness Status
-
-The local implementation is complete and the low-cost Alibaba Cloud Function Compute agent is live. Public proof links are filled; the demo video is intentionally removed and final Devpost submission still requires owner-only eligibility and profile confirmations.
-
-- Local code and docs: implemented
-- Alibaba Cloud Function Compute agent: live verified on `2026-07-15`
-- Live verification command: `npm run live:check`
-- Cloud endpoint: `https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run`
-- Hosted UI: `https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run/`
-- Proof record: [docs/proof/function-compute-live-proof.md](./docs/proof/function-compute-live-proof.md)
-- Model Studio Managed Agent creation: optional, not required for the Devpost minimum
-- Remote MCP registration: optional, not required for the Devpost minimum
-- End-to-end cloud agent session: optional, not required for the Devpost minimum
-- Owner confirmations: still required for Devpost profile and eligibility answers
-
-The strict readiness definition is documented in [docs/HACKATHON_READINESS_STANDARD.md](./docs/HACKATHON_READINESS_STANDARD.md).
-
-## Submission Workbench
-
-- [docs/DEVPOST_SUBMISSION.md](./docs/DEVPOST_SUBMISSION.md) - draft project description and judging map
-- [docs/DEMO_SCRIPT.md](./docs/DEMO_SCRIPT.md) - three-minute demo outline
-- [docs/ALIBABA_CLOUD_DEPLOYMENT.md](./docs/ALIBABA_CLOUD_DEPLOYMENT.md) - deployment and proof checklist
-- [docs/MODEL_STUDIO_MANAGED_AGENT.md](./docs/MODEL_STUDIO_MANAGED_AGENT.md) - optional Managed Agent and MCP integration path
-- [docs/HACKATHON_READINESS_STANDARD.md](./docs/HACKATHON_READINESS_STANDARD.md) - strict definition of when the project can be called ready
-- [docs/HACKATHON_PROOF.md](./docs/HACKATHON_PROOF.md) - final evidence file that must be filled before submission
-- [HACKATHON_COMPLETION_CHECKLIST.md](./HACKATHON_COMPLETION_CHECKLIST.md) - remaining work before final submission
-
-## Implementation Check
+Or call the deployed agent directly:
 
 ```bash
-npm run implementation:check
+curl --max-time 120 \
+  -X POST https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run/api/creative/autopilot \
+  -H 'Content-Type: application/json' \
+  --data '{"prompt":"What creative territory should Celsius test next, and what requires human approval?"}'
 ```
 
-This validates the local implementation by running typecheck, tests, production builds, and an implementation artifact audit.
+Expected proof fields include:
 
-## Final Submission Check
+```json
+{
+  "mode": "live",
+  "status": "pending_human_review",
+  "provider": "Alibaba Cloud Model Studio",
+  "model": "qwen-plus"
+}
+```
+
+Additional evidence is recorded in [function-compute-live-proof.md](./docs/proof/function-compute-live-proof.md) and [function-compute-console.jpg](./docs/proof/function-compute-console.jpg).
+
+## Reality and Data Integrity
+
+Signal deliberately fails closed:
+
+- Production routes do not serve seeded, fixture, mock, or fabricated fallback packets.
+- Missing live configuration returns `503 CreativeNotConfigured`.
+- An optional upstream response marked `fallback` is rejected.
+- Localhost upstreams are rejected in production.
+- Qwen and upstream JSON are schema-validated before reaching the UI.
+- Test files use mocked network responses for deterministic tests; those mocks are not available through production routes.
+
+There is also an important data limitation: in Qwen-only mode, creative observations come from model-assisted public web search, and health scores are model-derived estimates. They are not authenticated Meta Ads or TikTok Ads account metrics. For account-level measurement, connect a licensed live backend through `CREATIVE_INTEL_API_BASE_URL` and `CREATIVE_INTEL_BRAND_ID`.
+
+All generated recommendations remain subject to human review. Signal does not autonomously publish ads, move budget, or modify a production campaign.
+
+## Technology
+
+- **Frontend:** Next.js 16, React 18, TypeScript
+- **API:** Express, Zod, Helmet, CORS
+- **AI:** Alibaba Cloud Model Studio, `qwen-plus`, OpenAI-compatible chat completions, Qwen web search
+- **Agent tools:** Model Context Protocol SDK with stdio, Streamable HTTP, and SSE transports
+- **Cloud:** Alibaba Cloud Function Compute; optional ACS container and Terraform assets
+- **Quality:** Vitest, Supertest, TypeScript project references, Playwright, npm audit
+
+## Repository Layout
+
+```text
+apps/
+  api/                         Express API and creative intelligence service
+  mcp/                         MCP tools and remote transports
+  web/                         Next.js operator dashboard
+deploy/alibaba-cloud/
+  function-compute/            Live low-cost Function Compute runtime
+  acs/                         Container deployment path
+  model-studio/                Optional Managed Agent and MCP assets
+  terraform/                   Optional expanded Alibaba Cloud stack
+docs/
+  proof/                       Public cloud proof artifacts
+  DEVPOST_SUBMISSION.md        Ready-to-paste project description
+  DEMO_SCRIPT.md               Demo recording outline
+  HACKATHON_PROOF.md           Submission evidence source of truth
+scripts/                       Verification, environment, and demo automation
+```
+
+## Local Setup
+
+### Requirements
+
+- Node.js `20.9.0` or newer
+- npm
+- An Alibaba Cloud Model Studio API key
+- A Model Studio workspace ID when using the Singapore workspace endpoint
+
+### Install
 
 ```bash
+git clone https://github.com/shahaman098/Signal.git
+cd Signal
+npm install
+cp .env.example .env
+```
+
+Add your own credentials to `.env`. Never commit that file.
+
+For the minimal Qwen-only path:
+
+```dotenv
+DASHSCOPE_API_KEY=your_model_studio_api_key
+WORKSPACE_ID=your_workspace_id
+QWEN_MODEL=qwen-plus
+SIGNAL_TARGET_BRAND_NAME=Celsius
+SIGNAL_TARGET_CATEGORY=energy drinks
+```
+
+Leave `CREATIVE_INTEL_API_BASE_URL` and `CREATIVE_INTEL_BRAND_ID` empty to use Qwen web search. Detailed setup is in [LOCAL_QWEN_SETUP.md](./docs/LOCAL_QWEN_SETUP.md).
+
+### Run
+
+Start the API and web app in separate terminals:
+
+```bash
+npm run dev:api
+```
+
+```bash
+npm run dev:web
+```
+
+Open [http://127.0.0.1:3000/creative](http://127.0.0.1:3000/creative). The local API listens on `http://127.0.0.1:4000` by default.
+
+For local development, keep `HOST=127.0.0.1`. Use `HOST=0.0.0.0` only inside a container or cloud runtime that needs external ingress.
+
+## Configuration
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `DASHSCOPE_API_KEY` | Yes for Qwen mode | Alibaba Model Studio credential; server-side only |
+| `WORKSPACE_ID` | Recommended | Selects the Singapore workspace-specific API endpoint |
+| `QWEN_BASE_URL` | Optional | Explicit OpenAI-compatible endpoint override |
+| `QWEN_MODEL` | Optional | Defaults to `qwen-plus` |
+| `SIGNAL_TARGET_BRAND_NAME` | Qwen overview mode | Brand used for public web-search collection |
+| `SIGNAL_TARGET_CATEGORY` | Qwen overview mode | Category used for public web-search collection |
+| `CREATIVE_INTEL_API_BASE_URL` | Optional alternative | Licensed live creative-intelligence backend |
+| `CREATIVE_INTEL_BRAND_ID` | With optional backend | Brand workspace identifier |
+| `CREATIVE_INTEL_TIMEOUT_MS` | Optional | Upstream and Qwen timeout; defaults to 30000 ms |
+| `API_BASE_URL` | Web server | Origin used by the Next.js proxy |
+| `SIGNAL_API_BASE_URL` | MCP service | Signal API origin used by MCP tools |
+
+See [.env.example](./.env.example) for the complete configuration surface.
+
+## API
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | API health check |
+| `GET` | `/api/creative/overview` | Latest creative portfolio and pattern overview |
+| `POST` | `/api/creative/radar` | Qwen brief for an operator prompt |
+| `POST` | `/api/creative/autopilot` | Full recommended action, evidence, brief, checkpoints, and next actions |
+
+Example local autopilot request:
+
+```bash
+curl --max-time 120 \
+  -X POST http://127.0.0.1:4000/api/creative/autopilot \
+  -H 'Content-Type: application/json' \
+  --data '{"prompt":"Which creative family should we refresh next?"}'
+```
+
+The prompt is optional for `/autopilot`. When omitted, Signal derives the goal from the latest portfolio state.
+
+## MCP Tools
+
+The optional MCP service exposes the same verified backend workflow to an MCP-compatible agent:
+
+- `creative_overview`
+- `creative_radar`
+- `creative_autopilot`
+
+Run it locally over stdio:
+
+```bash
+npm run dev:mcp
+```
+
+Or expose the remote HTTP/SSE transport:
+
+```bash
+npm run dev:mcp:http
+```
+
+See [apps/mcp/README.md](./apps/mcp/README.md) and [MODEL_STUDIO_MANAGED_AGENT.md](./docs/MODEL_STUDIO_MANAGED_AGENT.md).
+
+## Verification
+
+```bash
+# Typecheck, tests, production builds, and implementation artifact audit
+npm run implementation:check
+
+# Real deployed Alibaba Cloud and Qwen request
+npm run live:check
+
+# Dependency advisory scan
+npm audit
+
+# Strict final Devpost evidence gate
 npm run submission:check
 ```
 
-This must fail until [docs/HACKATHON_PROOF.md](./docs/HACKATHON_PROOF.md) has the required Devpost proof: public repo, visible license, Alibaba Cloud deployment code proof, Alibaba Cloud screenshot proof, architecture URL, demo video URL, Track 4, final description status, and required Devpost answers.
+These commands prove different things:
 
-The submission gate rejects local-only or unverifiable required proof, including:
+- `implementation:check` validates the repository and rejects production demo-data paths.
+- `live:check` calls the public Alibaba Cloud endpoint and verifies live Qwen agent packets.
+- `submission:check` also requires the public video URL and owner-only Devpost answers.
 
-- `localhost` or private-network proof URLs
-- placeholder required values in the proof file
+The latest full implementation run passed type generation, TypeScript, 10 tests, API/MCP/web production builds, and the artifact audit. `npm audit` reported zero known vulnerabilities.
+
+## Demo Video
+
+Generate the local walkthrough with:
+
+```bash
+npm run demo:record
+```
+
+The script records the browser flow with Playwright and writes:
+
+```text
+output/demo/signal-qwen-demo.mp4
+```
+
+The current generated video is approximately 63 seconds, below the official three-minute limit. `ffmpeg` is required for the final MP4; macOS `say` is used for narration when available. The `output` directory is intentionally ignored by Git.
+
+Before submission, upload the MP4 as a publicly visible YouTube, Vimeo, or Youku video, add the URL to [HACKATHON_PROOF.md](./docs/HACKATHON_PROOF.md), and rerun `npm run submission:check`.
+
+## Alibaba Cloud Deployment
+
+The live proof uses the low-cost Function Compute path:
+
+- [Standalone Qwen agent](./deploy/alibaba-cloud/function-compute/standalone-agent.py)
+- [Function Compute deployment guide](./deploy/alibaba-cloud/function-compute/README.md)
+- [Bootstrap runtime](./deploy/alibaba-cloud/function-compute/bootstrap)
+- [Deployment package builder](./deploy/alibaba-cloud/function-compute/build-package.sh)
+
+Additional optional paths are included for containers, Terraform, Model Studio Managed Agents, and remote MCP registration. They are useful expansion paths but are not represented as completed live infrastructure unless proof is present.
+
+## Hackathon Submission Checklist
+
+- [x] Project uses Qwen Cloud API
+- [x] Backend is running on Alibaba Cloud
+- [x] Public source repository
+- [x] Visible MIT license
+- [x] Architecture diagram
+- [x] Text description explaining features and functionality
+- [x] Public working-project access for judges
+- [x] Track identified as Track 4: Autopilot Agent
+- [x] Local demo video generated under three minutes
+- [ ] Demo uploaded publicly and URL added to the proof file
+- [ ] Owner profile, residence, learning level, and eligibility confirmations completed
+- [ ] `npm run submission:check` passes
+- [ ] Devpost submission finalized before July 20, 2026 at 2:00 PM PDT
+
+The authoritative local checklist is [HACKATHON_COMPLETION_CHECKLIST.md](./HACKATHON_COMPLETION_CHECKLIST.md).
+
+## Security and Operational Notes
+
+- Keep `DASHSCOPE_API_KEY` and workspace credentials in `.env` or a cloud secret store.
+- `.env` is ignored and must never be committed.
+- The browser communicates through the server-side API proxy; model credentials are not sent to the client.
+- Public endpoints should receive rate limiting and authentication before use beyond judging or controlled evaluation.
+- Generated strategy is advisory and requires operator review.
+
+## License
+
+[MIT](./LICENSE)
