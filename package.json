@@ -14,9 +14,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "dev:api": "tsx watch --env-file=.env apps/api/src/server.ts",
-    "dev:mcp": "npm run dev --workspace @signal/mcp",
-    "dev:mcp:http": "npm run dev:http --workspace @signal/mcp",
-    "dev:web": "npm run dev --workspace @signal/web",
+    "dev:mcp": "node scripts/run-with-env.mjs npm run dev --workspace @signal/mcp",
+    "dev:mcp:http": "node scripts/run-with-env.mjs npm run dev:http --workspace @signal/mcp",
+    "dev:web": "node scripts/run-with-env.mjs npm run dev --workspace @signal/web",
     "typecheck": "tsc -b"
   },
   "devDependencies": {

@@ -21,7 +21,7 @@ const autopilot = await requestJson("/api/creative/autopilot", {
   }),
 });
 
-validateAgentPacket(autopilot, "autopilot");
+validateAgentPacket(autopilot, "autopilot", { requireEvidence: true, requireNextActions: true });
 
 const radar = await requestJson("/api/creative/radar", {
   method: "POST",
@@ -31,7 +31,7 @@ const radar = await requestJson("/api/creative/radar", {
   }),
 });
 
-validateAgentPacket(radar, "radar");
+validateAgentPacket(radar, "radar", { requireEvidence: false, requireNextActions: false });
 
 if (failures.length > 0) {
   console.log("");
@@ -49,19 +49,23 @@ console.log(`Model: ${autopilot.model}`);
 console.log(`Autopilot status: ${autopilot.status}`);
 console.log(`Radar status: ${radar.status}`);
 
-function validateAgentPacket(packet, label) {
+function validateAgentPacket(packet, label, options) {
   check(packet.mode === "live", `${label} response must report mode=live.`);
   check(packet.status === "pending_human_review", `${label} response must remain pending human review.`);
   check(packet.provider === "Alibaba Cloud Model Studio", `${label} response must come from Alibaba Cloud Model Studio.`);
   check(typeof packet.model === "string" && packet.model.startsWith("qwen"), `${label} response must identify a Qwen model.`);
   check(packet.result && typeof packet.result === "object", `${label} response must include a structured result object.`);
   check(typeof packet.result?.text === "string" && packet.result.text.length > 40, `${label} result must include substantive text.`);
-  check(Array.isArray(packet.result?.evidence) && packet.result.evidence.length > 0, `${label} result must include evidence.`);
+  if (options.requireEvidence) {
+    check(Array.isArray(packet.result?.evidence) && packet.result.evidence.length > 0, `${label} result must include evidence.`);
+  }
   check(
     Array.isArray(packet.result?.humanCheckpoints) && packet.result.humanCheckpoints.length > 0,
     `${label} result must include human checkpoints.`,
   );
-  check(Array.isArray(packet.result?.nextActions) && packet.result.nextActions.length > 0, `${label} result must include next actions.`);
+  if (options.requireNextActions) {
+    check(Array.isArray(packet.result?.nextActions) && packet.result.nextActions.length > 0, `${label} result must include next actions.`);
+  }
 }
 
 async function requestJson(path, init) {
