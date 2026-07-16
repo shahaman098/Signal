@@ -105,6 +105,7 @@ Notes:
 - The API exposes `GET /api/creative/overview`, `POST /api/creative/radar`, and `POST /api/creative/autopilot`.
 - When upstream or Qwen credentials are missing, the API returns an error instead of fake production content.
 - In `NODE_ENV=production`, `CREATIVE_INTEL_API_BASE_URL` must not be `localhost`, `127.0.0.1`, or another local-only hostname.
+- Local Qwen setup steps are documented in [docs/LOCAL_QWEN_SETUP.md](./docs/LOCAL_QWEN_SETUP.md).
 
 ## Reality Checks
 
