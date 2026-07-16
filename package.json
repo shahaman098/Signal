@@ -10,6 +10,7 @@
     "build": "npm run build --workspaces --if-present",
     "implementation:check": "npm run typecheck && npm test && npm run build && node scripts/verify-implementation.mjs",
     "live:check": "node scripts/verify-live.mjs",
+    "demo:record": "node scripts/record-demo.mjs",
     "submission:check": "npm run typecheck && npm test && npm run build && node scripts/verify-submission.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -17,14 +18,21 @@
     "dev:mcp": "node scripts/run-with-env.mjs npm run dev --workspace @signal/mcp",
     "dev:mcp:http": "node scripts/run-with-env.mjs npm run dev:http --workspace @signal/mcp",
     "dev:web": "node scripts/run-with-env.mjs npm run dev --workspace @signal/web",
-    "typecheck": "tsc -b"
+    "typecheck": "npm run typegen --workspace @signal/web && tsc -b"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
+    "playwright": "^1.61.1",
+    "postcss": "^8.5.19",
     "typescript": "^5.5.4",
-    "vitest": "^2.0.5"
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=20"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.19"
+    }
   }
 }

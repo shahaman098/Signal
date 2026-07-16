@@ -2,6 +2,14 @@
 
 This is a three-minute demo outline optimized for the Devpost judging criteria.
 
+Record the current demo video locally with:
+
+```bash
+npm run demo:record
+```
+
+The generated MP4 is written to `output/demo/signal-qwen-demo.mp4`. Upload that file publicly to YouTube, Vimeo, or Facebook Video before running `npm run submission:check`.
+
 ## 0:00 to 0:20 - Problem
 
 Open with the business pain:

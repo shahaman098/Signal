@@ -8,9 +8,9 @@ const API_BASE_URL =
 export const dynamic = "force-dynamic";
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     path: string[];
-  };
+  }>;
 };
 
 function buildTargetUrl(path: string[], search: string): URL {
@@ -29,12 +29,13 @@ function copyRequestHeaders(request: NextRequest): Headers {
 }
 
 async function proxy(request: NextRequest, { params }: RouteContext): Promise<Response> {
+  const { path } = await params;
   const body =
     request.method === "GET" || request.method === "HEAD"
       ? undefined
       : await request.arrayBuffer();
 
-  const upstream = await fetch(buildTargetUrl(params.path, request.nextUrl.search), {
+  const upstream = await fetch(buildTargetUrl(path, request.nextUrl.search), {
     method: request.method,
     headers: copyRequestHeaders(request),
     body,
