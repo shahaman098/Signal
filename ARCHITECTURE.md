@@ -46,13 +46,19 @@ flowchart LR
 1. The operator runs the `Autopilot Agent` from the same panel.
 2. The API fetches live overview data and identifies the weakest owned family, strongest competitor signal, and open pattern territory.
 3. The API composes an agent goal and grounded mission prompt, then calls Qwen Model Studio directly.
-4. The API returns a structured agent packet with:
+4. The API then audits its own packet before returning it:
+   - every URL cited in the brief, thinking, or meta signals is fetched and its live reachability recorded
+   - a second adversarial Qwen pass grades each factual claim as `verified`, `unverified`, or `model_estimate` and returns an auditor confidence score and cautions
+   - if the audit pass fails, the packet reports `audit_unavailable` rather than inventing a verdict
+5. The API returns a structured agent packet with:
    - the goal
    - a recommended action type
    - grounding evidence
    - the Qwen brief
+   - the trust report (audit verdict, claim grades, source checks, cautions)
    - human checkpoints
-5. The operator approves or rejects that packet before any downstream handoff.
+6. The run is registered as `pending_human_review` in an append-only review ledger.
+7. The operator approves, rejects, or requests revision through `POST /api/creative/runs/:runId/decision`; approval is refused unless the operator explicitly acknowledges every checkpoint, and each decision is persisted with operator, note, and timestamp.
 
 ## Human-in-the-Loop Design
 
@@ -61,6 +67,8 @@ Signal is intentionally not a one-click autonomous publisher. The operator must 
 - brand fit
 - channel and format fit
 - enough novelty to avoid repeated fatigue
+
+The gate is enforced rather than advisory: the review ledger rejects approvals that do not acknowledge the checkpoints, refuses double-decisions, and keeps an append-only audit trail. Combined with the adversarial self-audit, the operator decides with the agent's own doubts on the table — which claims are verified, which citations resolve, and where the auditor lost confidence.
 
 That keeps the product aligned with Track 4's requirement for human checkpoints at critical decision points while still automating the evidence gathering and first-pass reasoning.
 

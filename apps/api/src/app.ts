@@ -3,11 +3,13 @@ import cors from "cors";
 import helmet from "helmet";
 import { randomUUID } from "node:crypto";
 import { CreativeIntelligenceService } from "./services/creative-intelligence.service.js";
+import { ReviewLedgerService } from "./services/review-ledger.service.js";
 import { creativeRoutes } from "./routes/creative.routes.js";
 
 export function createApp(): Express {
   const app = express();
   const creative = new CreativeIntelligenceService();
+  const reviews = new ReviewLedgerService();
 
   app.disable("x-powered-by");
   app.use((req, res, next) => {
@@ -26,7 +28,7 @@ export function createApp(): Express {
   app.use(express.json());
 
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
-  app.use("/api/creative", creativeRoutes(creative));
+  app.use("/api/creative", creativeRoutes(creative, reviews));
 
   app.use((_req, res) =>
     res.status(404).json({

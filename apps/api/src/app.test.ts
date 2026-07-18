@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { createApp } from "./app.js";
 
 function mockCreativeBackend(overrides?: {
@@ -77,7 +80,20 @@ function mockCreativeBackend(overrides?: {
     if (url === "https://qwen.example/compatible-mode/v1/chat/completions" && init?.method === "POST") {
       const body = JSON.parse(String(init.body ?? "{}"));
       const system = String(body.messages?.[0]?.content ?? "");
-      const content = system.includes("live creative-intelligence data collector")
+      const content = system.includes("adversarial evidence auditor")
+        ? {
+            confidence: 0.78,
+            verdict: "operator_caution",
+            claims: [
+              {
+                claim: "Creator proof appears stronger than offer-led creative.",
+                grade: "model_estimate",
+                note: "Derived from web-search health estimates, not account metrics.",
+              },
+            ],
+            cautions: ["Health scores are model-derived estimates pending operator confirmation."],
+          }
+        : system.includes("live creative-intelligence data collector")
         ? {
             brand: { name: "Live Brand", category: "Energy Drinks" },
             owned_ads: [
@@ -183,6 +199,10 @@ function mockCreativeBackend(overrides?: {
 describe("creative API", () => {
   beforeEach(() => {
     delete process.env.NODE_ENV;
+    process.env.SIGNAL_REVIEW_LEDGER_PATH = path.join(
+      mkdtempSync(path.join(tmpdir(), "signal-review-ledger-")),
+      "review-ledger.jsonl",
+    );
     delete process.env.DASHSCOPE_API_KEY;
     delete process.env.QWEN_BASE_URL;
     delete process.env.QWEN_MODEL;
@@ -234,6 +254,51 @@ describe("creative API", () => {
     expect(res.body.recommendation.type).toBe("refresh_family");
     expect(res.body.brief.brief.title).toBe("Creator Proof Refresh Brief");
     expect(res.body.humanCheckpoints.length).toBeGreaterThan(0);
+  });
+
+  it("includes an adversarial trust audit on every autopilot run", async () => {
+    const app = createApp();
+    const res = await request(app).post("/api/creative/autopilot").send({});
+    expect(res.status).toBe(200);
+    expect(typeof res.body.runId).toBe("string");
+    expect(res.body.trust.verdict).toBe("operator_caution");
+    expect(res.body.trust.confidence).toBe(0.78);
+    expect(res.body.trust.claims[0].grade).toBe("model_estimate");
+    expect(res.body.trust.cautions.length).toBeGreaterThan(0);
+  });
+
+  it("enforces the human approval gate through the review ledger", async () => {
+    const app = createApp();
+    const runRes = await request(app).post("/api/creative/autopilot").send({});
+    const runId = runRes.body.runId as string;
+
+    const listed = await request(app).get("/api/creative/runs");
+    expect(listed.status).toBe(200);
+    expect(listed.body.runs[0].runId).toBe(runId);
+    expect(listed.body.runs[0].status).toBe("pending_human_review");
+
+    const unacknowledged = await request(app)
+      .post(`/api/creative/runs/${runId}/decision`)
+      .send({ action: "approve", operator: "Aman" });
+    expect(unacknowledged.status).toBe(409);
+    expect(unacknowledged.body.message).toContain("acknowledgedCheckpoints");
+
+    const approved = await request(app)
+      .post(`/api/creative/runs/${runId}/decision`)
+      .send({ action: "approve", operator: "Aman", acknowledgedCheckpoints: true, note: "Brand fit confirmed" });
+    expect(approved.status).toBe(200);
+    expect(approved.body.status).toBe("approved");
+    expect(approved.body.decision.operator).toBe("Aman");
+
+    const repeated = await request(app)
+      .post(`/api/creative/runs/${runId}/decision`)
+      .send({ action: "reject", operator: "Aman" });
+    expect(repeated.status).toBe(409);
+
+    const missing = await request(app)
+      .post("/api/creative/runs/not-a-run/decision")
+      .send({ action: "reject", operator: "Aman" });
+    expect(missing.status).toBe(404);
   });
 
   it("runs from Qwen web-search data when no separate creative backend is configured", async () => {

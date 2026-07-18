@@ -1,7 +1,13 @@
 "use client";
 
 import { startTransition, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { CreativeAutopilotRun } from "../../lib/api";
+import {
+  api,
+  type CreativeAutopilotRun,
+  type ReviewDecisionAction,
+  type ReviewRecord,
+  type TrustClaimGrade,
+} from "../../lib/api";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -113,7 +119,287 @@ function TopMetric({
   );
 }
 
-export function CreativeDashboard({ run }: { run: CreativeAutopilotRun }) {
+function LoadingDashboard({ error }: { error: string | null }) {
+  return (
+    <section className="dashboard-page" id="overview">
+      <header className="dashboard-topbar">
+        <div className="dashboard-greeting">
+          <div className="dashboard-avatar">S</div>
+          <div>
+            <h1>Hello, creative lead.</h1>
+            <p>{error ? "Signal could not load the live creative workspace." : "Signal is loading the live creative workspace."}</p>
+          </div>
+        </div>
+        <div className="dashboard-actions">
+          <button className="icon-action" type="button" aria-label="Search">
+            <Search size={22} />
+          </button>
+          <button className="icon-action icon-action-strong" type="button" aria-label="Notifications">
+            <Bell size={22} />
+            <span className="notification-dot" />
+          </button>
+        </div>
+      </header>
+
+      <section className="dashboard-toolbar">
+        <div className="workspace-switches">
+          <button className="workspace-pill active" type="button">Manager</button>
+          <button className="workspace-pill" type="button">Canvas</button>
+          <button className="workspace-pill" type="button">Monitoring</button>
+        </div>
+        <div className="dashboard-searchbar">
+          <Search size={16} />
+          <span>Preparing live Qwen-backed recommendations</span>
+        </div>
+      </section>
+
+      <section className="top-monitor-grid">
+        <div className="top-monitor-column">
+          <div className="top-monitor-metrics">
+            <TopMetric title="Evidence trail" value="--" note="waiting for live web-grounded signals">
+              <div className="spark-lines">
+                <div className="spark-line spark-line-violet" />
+                <div className="spark-line spark-line-amber" />
+                <div className="spark-line-axis" />
+                <div className="spark-badge">...</div>
+              </div>
+            </TopMetric>
+
+            <TopMetric title="Operator confidence" value="--" note="calculated after the first agent packet returns">
+              <div className="ring-chart" style={ringStyle(0.12, "var(--accent-violet)", "var(--panel-soft)")}>
+                <div className="ring-chart-center">...</div>
+              </div>
+            </TopMetric>
+
+            <TopMetric title="Review flow" value="--" note="human checkpoints will appear with the brief">
+              <div className="micro-bars">
+                {[0, 1, 2, 3].map((index) => (
+                  <div className="micro-bar-stack" key={index}>
+                    <span className="micro-bar micro-bar-muted" style={{ height: `${54 + index * 8}px` }} />
+                    <span className="micro-bar micro-bar-open" style={{ height: `${24 + index * 6}px` }} />
+                  </div>
+                ))}
+              </div>
+            </TopMetric>
+          </div>
+        </div>
+
+        <section className="monitor-card operator-card" id="operator">
+          <div className="operator-card-head">
+            <div>
+              <div className="monitor-card-title">Signal Operator</div>
+              <h2>{error ? "Live creative workspace unavailable" : "Building the first operator brief"}</h2>
+            </div>
+            <span className="operator-status">{error ? "attention required" : "loading"}</span>
+          </div>
+          {error ? <div className="err-banner">{error}</div> : <div className="creative-muted">Qwen autopilot can take 30 to 90 seconds on a live run.</div>}
+        </section>
+      </section>
+    </section>
+  );
+}
+
+export function CreativeDashboard({ initialRun }: { initialRun: CreativeAutopilotRun | null }) {
+  const [run, setRun] = useState<CreativeAutopilotRun | null>(initialRun);
+  const [initialError, setInitialError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (run) return;
+
+    let active = true;
+    void api.creativeAutopilot()
+      .then((next) => {
+        if (active) setRun(next);
+      })
+      .catch((err) => {
+        if (active) {
+          setInitialError(err instanceof Error ? err.message : "Creative radar is unavailable.");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [run]);
+
+  if (!run) {
+    return <LoadingDashboard error={initialError} />;
+  }
+
+  return <DashboardContent run={run} />;
+}
+
+const GRADE_TONE: Record<TrustClaimGrade, string> = {
+  verified: "good",
+  unverified: "critical",
+  model_estimate: "warning",
+};
+
+const GRADE_LABEL: Record<TrustClaimGrade, string> = {
+  verified: "Verified",
+  unverified: "Unverified",
+  model_estimate: "Model estimate",
+};
+
+function TrustPanel({ run }: { run: CreativeAutopilotRun }) {
+  const trust = run.trust;
+  const [operator, setOperator] = useState("Aman");
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [decision, setDecision] = useState<ReviewRecord | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+
+  if (!trust) return null;
+
+  const liveSources = trust.sources.filter((source) => source.reachable).length;
+  const verdictTone =
+    trust.verdict === "evidence_verified" ? "good" : trust.verdict === "operator_caution" ? "warning" : "critical";
+
+  async function decide(action: ReviewDecisionAction) {
+    if (!run.runId || submitting || decision) return;
+    setSubmitting(true);
+    setDecisionError(null);
+    try {
+      setDecision(
+        await api.decideRun(run.runId, {
+          action,
+          operator,
+          acknowledgedCheckpoints: acknowledged,
+        }),
+      );
+    } catch (err) {
+      setDecisionError(err instanceof Error ? err.message : "The review decision could not be recorded.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="monitor-card" id="trust-audit">
+      <div className="monitor-section-head">
+        <div>
+          <div className="monitor-card-title">Agent self-audit</div>
+          <h2>Trust report, then the human decision</h2>
+        </div>
+        <span className={`badge ${verdictTone}`}>{trust.verdict.replaceAll("_", " ")}</span>
+      </div>
+
+      <div className="creative-output-top">
+        <span className="badge neutral">Auditor confidence {asPercent(trust.confidence)}</span>
+        <span className="badge neutral">
+          {liveSources}/{trust.sources.length} cited sources reachable
+        </span>
+        {trust.auditModel && <span className="badge neutral">Audited by {trust.auditModel}</span>}
+      </div>
+
+      {trust.claims.length > 0 && (
+        <div className="row-list">
+          {trust.claims.map((claim) => (
+            <div className="row" key={claim.claim}>
+              <span className={`badge ${GRADE_TONE[claim.grade]}`}>{GRADE_LABEL[claim.grade]}</span>
+              <div className="row-title">
+                <strong>{claim.claim}</strong>
+                <span className="row-meta">{claim.note}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {trust.sources.length > 0 && (
+        <div className="row-list">
+          {trust.sources.map((source) => (
+            <div className="row" key={source.url}>
+              <span className={`badge ${source.reachable ? "good" : "critical"}`}>
+                {source.reachable ? "Live" : "Unreachable"}
+              </span>
+              <div className="row-title">
+                <strong>{source.url}</strong>
+                <span className="row-meta">
+                  {source.httpStatus === null ? "No response before timeout" : `HTTP ${source.httpStatus}`}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {trust.cautions.length > 0 && (
+        <div className="err-banner">
+          {trust.cautions.map((caution) => (
+            <div key={caution}>{caution}</div>
+          ))}
+        </div>
+      )}
+
+      {run.runId && (
+        <div className="creative-input-row" style={{ marginTop: 16 }}>
+          <div className="creative-review-list">
+            {run.humanCheckpoints.map((checkpoint) => (
+              <div className="creative-review-item" key={checkpoint}>
+                <span className="creative-muted">{checkpoint}</span>
+              </div>
+            ))}
+            <label className="creative-review-item">
+              <input
+                type="checkbox"
+                checked={acknowledged}
+                onChange={(event) => setAcknowledged(event.target.checked)}
+                disabled={Boolean(decision)}
+              />
+              <span>I reviewed every checkpoint above</span>
+            </label>
+          </div>
+          <input
+            className="creative-textarea"
+            style={{ minHeight: 0 }}
+            type="text"
+            value={operator}
+            onChange={(event) => setOperator(event.target.value)}
+            placeholder="Operator name"
+            aria-label="Operator name"
+            disabled={Boolean(decision)}
+          />
+          <div className="creative-actions">
+            <button
+              className="btn primary"
+              type="button"
+              disabled={!acknowledged || submitting || Boolean(decision)}
+              onClick={() => void decide("approve")}
+            >
+              Approve handoff
+            </button>
+            <button
+              className="btn"
+              type="button"
+              disabled={submitting || Boolean(decision)}
+              onClick={() => void decide("request_revision")}
+            >
+              Request revision
+            </button>
+            <button
+              className="btn"
+              type="button"
+              disabled={submitting || Boolean(decision)}
+              onClick={() => void decide("reject")}
+            >
+              Reject
+            </button>
+          </div>
+          {decision && (
+            <div className="creative-approved-note">
+              Recorded in the audit trail: {decision.status.replaceAll("_", " ")} by {decision.decision?.operator}
+              {decision.decision?.decidedAt ? ` at ${decision.decision.decidedAt}` : ""}.
+            </div>
+          )}
+          {decisionError && <div className="err-banner">{decisionError}</div>}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function DashboardContent({ run }: { run: CreativeAutopilotRun }) {
   const evidenceFeed = [...run.evidence.bullets, ...run.evidence.metaSignals];
   const strategyFeed = run.brief.suggestions.length > 0 ? run.brief.suggestions : run.brief.brief.strategy;
   const totalSignals =
@@ -487,6 +773,8 @@ export function CreativeDashboard({ run }: { run: CreativeAutopilotRun }) {
           </section>
         </section>
       )}
+
+      {showTopStack && run.trust && <TrustPanel run={run} />}
 
       {showPressure && (
         <section className="monitor-card watchlist-card watchlist-card-full" id="pressure-board">

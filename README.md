@@ -1,6 +1,6 @@
 # Signal
 
-**A Qwen-powered creative intelligence autopilot that turns current public market signals into an operator-reviewed creative action plan.**
+**A self-auditing Qwen creative-intelligence autopilot: it gathers live market evidence, fact-checks its own recommendation with a second adversarial Qwen pass and live source verification, then routes the packet through an enforced human approval gate.**
 
 [Live Alibaba Cloud demo](https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run/) | [Architecture](./ARCHITECTURE.md) | [Cloud proof](./docs/proof/function-compute-live-proof.md) | [Devpost copy](./docs/DEVPOST_SUBMISSION.md)
 
@@ -8,14 +8,14 @@ Signal is built for the **Global AI Hackathon Series with Qwen Cloud**, **Track 
 
 ## Submission Status
 
-Status last verified on **July 16, 2026**.
+Status last verified on **July 18, 2026**.
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
 | Working project | Complete | Local and deployed Qwen flows return structured agent packets |
 | Public open-source repository | Complete | [GitHub repository](https://github.com/shahaman098/Signal) and [MIT license](./LICENSE) |
 | Qwen Cloud API usage | Complete | Direct Model Studio calls in [creative-intelligence.service.ts](./apps/api/src/services/creative-intelligence.service.ts) |
-| Alibaba Cloud deployment | Live | [Function Compute endpoint](https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run/) and [deployment code](./deploy/alibaba-cloud/function-compute/standalone-agent.py) |
+| Alibaba Cloud deployment | Live; redeploy pending for the new self-audit release | [Function Compute endpoint](https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run/) and [deployment code](./deploy/alibaba-cloud/function-compute/standalone-agent.py) |
 | Architecture diagram | Complete | [ARCHITECTURE.md](./ARCHITECTURE.md) |
 | Text description | Complete | [Devpost submission draft](./docs/DEVPOST_SUBMISSION.md) |
 | Demo recording | Generated locally | `output/demo/signal-qwen-demo.mp4`; public video URL still required |
@@ -45,9 +45,10 @@ Signal turns that process into an agent run.
 3. Calculates family health, pattern saturation, weak spots, competitor momentum, and open creative territory.
 4. Builds a grounded mission for Qwen from the latest portfolio state and the operator's natural-language prompt.
 5. Produces a structured recommendation, strategy brief, evidence packet, alerts, and next actions.
-6. Returns the run as `pending_human_review` until an operator confirms brand fit, platform fit, and novelty.
+6. **Audits itself before asking for approval:** a second adversarial Qwen pass grades every factual claim (`verified`, `unverified`, or `model_estimate`), every cited source URL is fetched and checked against the live web, and the packet carries the resulting trust report with an auditor confidence score.
+7. Returns the run as `pending_human_review` and registers it in an append-only review ledger; approval requires an operator to explicitly acknowledge every human checkpoint, and each decision is recorded with operator, note, and timestamp.
 
-The result is not merely a chat response. It is a repeatable decision packet that can be reviewed, approved, and handed to a creative team.
+The result is not merely a chat response. It is a repeatable decision packet that arrives pre-audited, can be approved or rejected through a real gate, and leaves an audit trail behind it.
 
 ## Core Features
 
@@ -56,7 +57,8 @@ The result is not merely a chat response. It is a repeatable decision packet tha
 | Creative overview | Owned and competitor creative nodes, portfolio statistics, family health, and pattern status |
 | Creative Radar | Qwen-generated analysis for ambiguous questions about fatigue, competitors, and white-space |
 | Autopilot Agent | A deterministic action type plus Qwen brief, evidence, checkpoints, and next actions |
-| Human review gate | Explicit approval requirements before production handoff |
+| Self-audit trust layer | A second adversarial Qwen pass grades every claim, and every cited source URL is verified against the live web before the operator sees the packet |
+| Enforced approval gate | Runs are registered in an append-only review ledger; approval requires explicit checkpoint acknowledgement and records operator, note, and timestamp |
 | Qwen web search | Current public creative and competitor observations when no separate backend is configured |
 | Typed validation | Zod validation for upstream data, Qwen completions, and API inputs |
 | Fail-closed runtime | Missing credentials or non-live upstream output returns an error instead of local demo data |
@@ -74,7 +76,7 @@ The official Track 4 brief asks for a production-oriented agent that automates a
 | End-to-end automation | Evidence collection, normalization, analysis, recommendation, and brief generation |
 | Ambiguous inputs | Operators can ask open-ended creative questions in the Radar panel |
 | External tools and services | Qwen Cloud API, Qwen web search, optional creative backend, and optional MCP service |
-| Human in the loop | Every autopilot result remains `pending_human_review` before handoff |
+| Human in the loop | Every autopilot result remains `pending_human_review`; the review ledger enforces checkpoint acknowledgement before an approval is accepted |
 | Production readiness | Timeouts, schema validation, structured errors, request IDs, security headers, and no production mock fallback |
 
 ## Architecture
@@ -93,7 +95,8 @@ flowchart LR
     upstream --> analysis
     analysis --> qwen["Alibaba Cloud Model Studio / qwen-plus"]
     qwen --> packet["Recommendation + brief + evidence + next actions"]
-    packet --> review["Human review gate"]
+    packet --> audit["Adversarial Qwen self-audit + live source verification"]
+    audit --> review["Enforced human approval gate + review ledger"]
     review --> handoff["Approved creative handoff"]
 
     mcp["Signal MCP service"] --> api
@@ -123,7 +126,8 @@ The public Function Compute deployment is available without authentication for j
 1. Open the [hosted proof UI](https://signal-en-agent-ersgaojhti.ap-southeast-1.fcapp.run/).
 2. Click **Run Qwen Autopilot** and wait for the live web-search and model request to finish.
 3. Confirm the response reports `mode=live`, `provider=Alibaba Cloud Model Studio`, `model=qwen-plus`, and `status=pending_human_review`.
-4. Inspect the returned evidence, human checkpoints, and next actions.
+4. Inspect the returned evidence, human checkpoints, next actions, and the `trust` report: the adversarial audit verdict, per-claim grades, and the live reachability check for every cited source URL.
+5. Use the on-page approval gate: approving without acknowledging the checkpoints is rejected with `409`, and every decision is recorded in the run ledger (`GET /api/creative/runs`).
 
 No login is required for this controlled judging endpoint. A live run can take roughly 30 to 90 seconds because it includes web search and model generation.
 
@@ -167,6 +171,8 @@ Signal deliberately fails closed:
 - Test files use mocked network responses for deterministic tests; those mocks are not available through production routes.
 
 There is also an important data limitation: in Qwen-only mode, creative observations come from model-assisted public web search, and health scores are model-derived estimates. They are not authenticated Meta Ads or TikTok Ads account metrics. For account-level measurement, connect a licensed live backend through `CREATIVE_INTEL_API_BASE_URL` and `CREATIVE_INTEL_BRAND_ID`.
+
+Signal treats that limitation as a first-class product problem rather than a footnote. Model-generated narrative can cite sources that do not exist, so every autopilot packet is adversarially audited before review: cited URLs are fetched and checked for reachability, each factual claim is graded `verified`, `unverified`, or `model_estimate` by a second Qwen pass, and the trust report ships with the packet. A claim is never presented as verified unless a reachable source or an independent web search confirms it. When the audit itself fails, the packet honestly reports `audit_unavailable` instead of inventing a verdict.
 
 All generated recommendations remain subject to human review. Signal does not autonomously publish ads, move budget, or modify a production campaign.
 
@@ -272,7 +278,9 @@ See [.env.example](./.env.example) for the complete configuration surface.
 | `GET` | `/health` | API health check |
 | `GET` | `/api/creative/overview` | Latest creative portfolio and pattern overview |
 | `POST` | `/api/creative/radar` | Qwen brief for an operator prompt |
-| `POST` | `/api/creative/autopilot` | Full recommended action, evidence, brief, checkpoints, and next actions |
+| `POST` | `/api/creative/autopilot` | Full recommended action, evidence, brief, trust audit, checkpoints, and next actions |
+| `GET` | `/api/creative/runs` | Review ledger: every registered run with its trust verdict and decision state |
+| `POST` | `/api/creative/runs/:runId/decision` | Record an operator decision (`approve`, `reject`, `request_revision`); approval requires `acknowledgedCheckpoints: true` |
 
 Example local autopilot request:
 

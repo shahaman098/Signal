@@ -23,6 +23,19 @@ const autopilot = await requestJson("/api/creative/autopilot", {
 
 validateAgentPacket(autopilot, "autopilot", { requireEvidence: true, requireNextActions: true });
 
+// The self-audit trust layer ships with the July 18 release; warn (not fail)
+// until the Function Compute deployment is updated to include it.
+if (autopilot.trust && typeof autopilot.trust === "object") {
+  check(
+    ["evidence_verified", "operator_caution", "audit_unavailable"].includes(autopilot.trust.verdict),
+    "autopilot trust report must include a valid audit verdict.",
+  );
+  check(Array.isArray(autopilot.trust.sources), "autopilot trust report must include source checks.");
+  check(typeof autopilot.runId === "string" && autopilot.runId.length > 0, "autopilot response must include a runId for the review ledger.");
+} else {
+  console.log("WARN deployed agent does not return a trust report yet; redeploy deploy/alibaba-cloud/function-compute/standalone-agent.py to enable the self-audit layer.");
+}
+
 const radar = await requestJson("/api/creative/radar", {
   method: "POST",
   headers: { "content-type": "application/json" },

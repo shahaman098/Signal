@@ -14,7 +14,7 @@ This checklist reflects the live Devpost requirements for the **Global AI Hackat
 
 - Local implementation: `DONE`
 - Hackathon submission: `OWNER CONFIRMATIONS REQUIRED`
-- Alibaba Cloud Function Compute agent: `LIVE VERIFIED`
+- Alibaba Cloud Function Compute agent: `LIVE VERIFIED` (redeploy of the July 18 self-audit + approval-gate release still required; paste the updated [standalone-agent.py](./deploy/alibaba-cloud/function-compute/standalone-agent.py) into the `signal-qwen-agent` function and rerun `npm run live:check`)
 - Alibaba Cloud deployment proof: `PUBLIC PROOF LINKS FILLED`
 - Live endpoint check: `npm run live:check`
 - Architecture doc: `DONE`

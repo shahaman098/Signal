@@ -170,7 +170,45 @@ export interface CreativeRecommendation {
   expectedImpact: string;
 }
 
+export type TrustClaimGrade = "verified" | "unverified" | "model_estimate";
+
+export interface TrustSourceCheck {
+  url: string;
+  reachable: boolean;
+  httpStatus: number | null;
+}
+
+export interface TrustClaim {
+  claim: string;
+  grade: TrustClaimGrade;
+  note: string;
+}
+
+export interface TrustReport {
+  verdict: string;
+  confidence: number;
+  auditModel: string | null;
+  claims: TrustClaim[];
+  sources: TrustSourceCheck[];
+  cautions: string[];
+}
+
+export type ReviewDecisionAction = "approve" | "reject" | "request_revision";
+
+export interface ReviewRecord {
+  runId: string;
+  status: string;
+  decision: null | {
+    action: ReviewDecisionAction;
+    operator: string;
+    note: string | null;
+    acknowledgedCheckpoints: boolean;
+    decidedAt: string;
+  };
+}
+
 export interface CreativeAutopilotRun {
+  runId?: string;
   mode: "live";
   status: string;
   goal: string;
@@ -180,6 +218,7 @@ export interface CreativeAutopilotRun {
   recommendation: CreativeRecommendation;
   evidence: CreativeEvidence;
   brief: CreativeRadarResult;
+  trust?: TrustReport;
   humanCheckpoints: string[];
   nextActions: string[];
 }
@@ -202,10 +241,14 @@ type LocalCreativeRadarEnvelope = {
 };
 
 type LocalCreativeAutopilotRun = {
+  runId?: string;
   mode: "live";
   status: string;
   goal: string;
   prompt: string;
+  provider?: string;
+  model?: string;
+  trust?: unknown;
   recommendation: {
     type: string;
     title: string;
@@ -243,13 +286,51 @@ type StandaloneCreativeResult = {
 };
 
 type StandaloneCreativeAutopilotRun = {
+  runId?: string;
   mode?: "live";
   status?: string;
   provider?: string;
   model?: string;
   goal?: string;
   result?: StandaloneCreativeResult;
+  trust?: unknown;
 };
+
+function normalizeTrust(raw: unknown): TrustReport | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const record = asRecord(raw);
+  const claims = Array.isArray(record.claims)
+    ? record.claims
+        .map((item) => asRecord(item))
+        .map((item) => ({
+          claim: asText(item.claim),
+          grade: (["verified", "unverified", "model_estimate"].includes(String(item.grade))
+            ? String(item.grade)
+            : "unverified") as TrustClaimGrade,
+          note: asText(item.note),
+        }))
+        .filter((item) => item.claim)
+    : [];
+  const sources = Array.isArray(record.sources)
+    ? record.sources
+        .map((item) => asRecord(item))
+        .map((item) => ({
+          url: asText(item.url),
+          reachable: item.reachable === true,
+          httpStatus: typeof item.httpStatus === "number" ? item.httpStatus : null,
+        }))
+        .filter((item) => item.url)
+    : [];
+
+  return {
+    verdict: asText(record.verdict, "audit_unavailable"),
+    confidence: typeof record.confidence === "number" ? record.confidence : 0,
+    auditModel: asText(record.auditModel) || null,
+    claims,
+    sources,
+    cautions: ensureStrings(record.cautions),
+  };
+}
 
 function normalizeBrief(raw: unknown, fallbackTitle: string): CreativeBrief {
   const brief = asRecord(raw);
@@ -341,10 +422,14 @@ function normalizeAutopilot(raw: LocalCreativeAutopilotRun | StandaloneCreativeA
   if ("recommendation" in raw && raw.recommendation && typeof raw.recommendation === "object" && "brief" in raw) {
     const local = raw as LocalCreativeAutopilotRun;
     return {
+      runId: local.runId,
       mode: local.mode,
       status: local.status,
       goal: local.goal,
       prompt: local.prompt,
+      provider: local.provider,
+      model: local.model,
+      trust: normalizeTrust(local.trust),
       recommendation: local.recommendation,
       evidence: {
         weakestFamily: local.evidence.weakestFamily,
@@ -369,12 +454,14 @@ function normalizeAutopilot(raw: LocalCreativeAutopilotRun | StandaloneCreativeA
   const evidenceBullets = ensureStrings(result.evidence);
 
   return {
+    runId: standalone.runId,
     mode: "live",
     status: asText(standalone.status, "pending_human_review"),
     goal,
     prompt: goal,
     provider: standalone.provider,
     model: standalone.model,
+    trust: normalizeTrust(standalone.trust),
     recommendation: {
       type: "live_operator_review",
       title: compactSentence(recommendation, "Recommended next move"),
@@ -397,6 +484,10 @@ function normalizeAutopilot(raw: LocalCreativeAutopilotRun | StandaloneCreativeA
 
 export const api = {
   creativeOverview: () => get<CreativeOverview>("/api/creative/overview"),
+  decideRun: (
+    runId: string,
+    decision: { action: ReviewDecisionAction; operator: string; note?: string; acknowledgedCheckpoints?: boolean },
+  ) => post<ReviewRecord>(`/api/creative/runs/${encodeURIComponent(runId)}/decision`, decision),
   creativeRadar: async (prompt: string) =>
     normalizeRadarEnvelope(
       await post<LocalCreativeRadarEnvelope | StandaloneCreativeAutopilotRun>("/api/creative/radar", { prompt }),

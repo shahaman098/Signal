@@ -19,13 +19,14 @@ rmSync(videoDir, { recursive: true, force: true });
 mkdirSync(videoDir, { recursive: true });
 
 const narration = [
-  "Signal is a creative intelligence autopilot for marketing teams that need faster decisions on what to refresh, retire, or scale.",
+  "Signal is a self auditing creative intelligence autopilot for marketing teams that need faster decisions on what to refresh, retire, or scale.",
   "The dashboard starts from live evidence, not local fixtures. The local app is configured to reach the live Alibaba Cloud Qwen backend or a local Qwen key when the API server is running.",
   "The operator can ask an ambiguous creative question, then run the Autopilot Agent.",
   "Signal rebuilds the latest overview, grounds the prompt in public creative and competitor signals, and asks Qwen Model Studio for a structured brief.",
-  "The response remains pending human review. The operator must confirm brand fit, platform fit, and novelty before any handoff.",
+  "Then Signal does something unusual: it does not trust itself. A second adversarial Qwen pass fact checks the packet, every cited source is fetched from the live web, and each claim is graded verified, unverified, or model estimate.",
+  "The trust report lands with the brief, and the run stays pending human review. Approval is enforced: the operator must acknowledge every checkpoint before the ledger accepts the decision, and each decision is recorded in an append only audit trail.",
   "The implementation includes typed validation, runtime rejection of fallback data, an Alibaba Cloud Function Compute proof endpoint, and a separate MCP tool service.",
-  "Signal demonstrates the Track Four Autopilot Agent pattern: a real business workflow, external tools, Qwen reasoning, and a human checkpoint at the decision boundary.",
+  "Signal demonstrates the Track Four Autopilot Agent pattern: a real business workflow, external tools, Qwen reasoning that audits itself, and an enforced human gate at the decision boundary.",
 ].join(" ");
 
 writeFileSync(narrationPath, `${narration}\n`);

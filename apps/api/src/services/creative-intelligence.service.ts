@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 
 export type CreativeHealth = "thriving" | "aging" | "fatiguing" | "declining";
 export type CreativePlatform = "meta" | "tiktok";
@@ -85,11 +86,38 @@ export type CreativeAgentActionType =
   | "counter_competitor"
   | "test_white_space";
 
+export type TrustClaimGrade = "verified" | "unverified" | "model_estimate";
+export type TrustVerdict = "evidence_verified" | "operator_caution" | "audit_unavailable";
+
+export interface TrustSourceCheck {
+  url: string;
+  reachable: boolean;
+  httpStatus: number | null;
+}
+
+export interface TrustClaim {
+  claim: string;
+  grade: TrustClaimGrade;
+  note: string;
+}
+
+export interface TrustReport {
+  verdict: TrustVerdict;
+  confidence: number;
+  auditModel: string | null;
+  claims: TrustClaim[];
+  sources: TrustSourceCheck[];
+  cautions: string[];
+}
+
 export interface CreativeAutopilotRun {
+  runId: string;
   mode: "live";
   status: "pending_human_review";
   goal: string;
   prompt: string;
+  provider?: string;
+  model?: string;
   recommendation: {
     type: CreativeAgentActionType;
     title: string;
@@ -104,6 +132,7 @@ export interface CreativeAutopilotRun {
     metaSignals: string[];
   };
   brief: CreativeRadarResult;
+  trust: TrustReport;
   humanCheckpoints: string[];
   nextActions: string[];
 }
@@ -170,6 +199,19 @@ const REMOTE_RADAR_SCHEMA = z.object({
   source: z.string(),
   mode: z.enum(["live", "fallback"]),
   result: RADAR_RESULT_SCHEMA,
+});
+
+const TRUST_AUDIT_SCHEMA = z.object({
+  confidence: z.number().min(0).max(1),
+  verdict: z.enum(["evidence_verified", "operator_caution"]),
+  claims: z.array(
+    z.object({
+      claim: z.string().min(1),
+      grade: z.enum(["verified", "unverified", "model_estimate"]),
+      note: z.string().min(1),
+    }),
+  ).min(1),
+  cautions: z.array(z.string().min(1)),
 });
 
 const QWEN_CHAT_COMPLETION_SCHEMA = z.object({
@@ -259,12 +301,16 @@ export class CreativeIntelligenceService {
     const missionPrompt = prompt?.trim() || buildAutopilotPrompt(overview, weakestFamily, strongestCompetitor, openPattern);
     const radar = await this.radarWithOverview(missionPrompt, overview);
     const recommendation = buildRecommendation(weakestFamily, strongestCompetitor, openPattern, radar.result);
+    const trust = await this.auditRun(radar.result, recommendation, overview.metaSignals);
+    const qwen = this.qwenConfig();
 
     return {
+      runId: randomUUID(),
       mode: "live",
       status: "pending_human_review",
       goal,
       prompt: missionPrompt,
+      ...(qwen ? { provider: "Alibaba Cloud Model Studio", model: qwen.model } : {}),
       recommendation,
       evidence: {
         weakestFamily: weakestFamily
@@ -295,6 +341,7 @@ export class CreativeIntelligenceService {
         metaSignals: overview.metaSignals,
       },
       brief: radar.result,
+      trust,
       humanCheckpoints: [
         "Confirm the recommendation matches the brand strategy and margin profile.",
         "Confirm the proposed hook and format fit the intended platform.",
@@ -348,6 +395,143 @@ export class CreativeIntelligenceService {
     };
   }
 
+  /**
+   * Adversarial self-audit: verifies every cited URL against the live web,
+   * then asks a second Qwen pass to grade each factual claim before the
+   * packet reaches the operator. Audit failure degrades honestly to
+   * `audit_unavailable` instead of blocking or inventing a verdict.
+   */
+  private async auditRun(
+    radar: CreativeRadarResult,
+    recommendation: CreativeAutopilotRun["recommendation"],
+    metaSignals: string[],
+  ): Promise<TrustReport> {
+    const auditedText = [
+      radar.text,
+      radar.brief.narrative,
+      ...radar.thinking,
+      ...radar.brief.strategy,
+      ...metaSignals,
+    ].join("\n");
+    const sources = await this.verifySources(extractUrls(auditedText));
+
+    const qwen = this.qwenConfig();
+    if (!qwen) {
+      return {
+        verdict: "audit_unavailable",
+        confidence: 0,
+        auditModel: null,
+        claims: [],
+        sources,
+        cautions: ["Qwen auditor is not configured, so claims in this packet were not adversarially graded."],
+      };
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs());
+    try {
+      const response = await fetch(`${qwen.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${qwen.apiKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: qwen.model,
+          temperature: 0,
+          response_format: { type: "json_object" },
+          enable_search: true,
+          search_options: {
+            forced_search: true,
+            search_strategy: "turbo",
+          },
+          messages: [
+            {
+              role: "system",
+              content: [
+                "You are Signal's adversarial evidence auditor. Another agent produced a creative recommendation packet; your only job is to find its weaknesses before a human operator reviews it.",
+                "Grade every distinct factual claim: 'verified' only when a reachable cited source or your own web search confirms it, 'unverified' when a citation exists but cannot be confirmed, 'model_estimate' when it is a plausible model-derived figure with no source.",
+                "Named studies, surveys, sample sizes, market-share figures, and dates without a reachable source URL must never be graded 'verified'.",
+                "Return strict JSON only. Do not wrap it in markdown.",
+                "The JSON must match this shape: {\"confidence\":0.0,\"verdict\":\"evidence_verified|operator_caution\",\"claims\":[{\"claim\":\"...\",\"grade\":\"verified|unverified|model_estimate\",\"note\":\"...\"}],\"cautions\":[\"...\"]}.",
+                "Use verdict 'operator_caution' whenever any claim is unverified or the recommendation depends mostly on model estimates.",
+              ].join(" "),
+            },
+            {
+              role: "user",
+              content: JSON.stringify({
+                recommendation,
+                narrative: radar.brief.narrative,
+                text: radar.text,
+                thinking: radar.thinking,
+                strategy: radar.brief.strategy,
+                metaSignals,
+                sourceChecks: sources,
+              }),
+            },
+          ],
+        }),
+        signal: controller.signal,
+      });
+
+      const raw = await response.text();
+      if (!response.ok) {
+        throw new CreativeUpstreamError(
+          `Qwen audit pass returned HTTP ${response.status}${raw ? `: ${raw.slice(0, 180)}` : ""}`,
+          response.status,
+        );
+      }
+
+      const completion = QWEN_CHAT_COMPLETION_SCHEMA.parse(JSON.parse(raw));
+      const audit = TRUST_AUDIT_SCHEMA.parse(parseJsonContent(completion.choices[0]!.message.content));
+      return {
+        verdict: audit.verdict,
+        confidence: audit.confidence,
+        auditModel: qwen.model,
+        claims: audit.claims,
+        sources,
+        cautions: audit.cautions,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        verdict: "audit_unavailable",
+        confidence: 0,
+        auditModel: qwen.model,
+        claims: [],
+        sources,
+        cautions: [`Adversarial audit pass failed, so treat every claim as unverified: ${message}`],
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private async verifySources(urls: string[]): Promise<TrustSourceCheck[]> {
+    return Promise.all(
+      urls.map(async (url): Promise<TrustSourceCheck> => {
+        const attempt = async (method: "HEAD" | "GET") => {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), SOURCE_CHECK_TIMEOUT_MS);
+          try {
+            return await fetch(url, { method, redirect: "follow", signal: controller.signal });
+          } finally {
+            clearTimeout(timeout);
+          }
+        };
+        try {
+          let res = await attempt("HEAD");
+          if (res.status === 405 || res.status === 501) {
+            res = await attempt("GET");
+          }
+          return { url, reachable: res.status < 400, httpStatus: res.status };
+        } catch {
+          return { url, reachable: false, httpStatus: null };
+        }
+      }),
+    );
+  }
+
   private async callQwenRadar(
     prompt: string,
     overview: CreativeOverview,
@@ -377,6 +561,7 @@ export class CreativeIntelligenceService {
               content: [
                 "You are Signal's creative autopilot agent.",
                 "Use only the supplied live creative data.",
+                "Cite a full source URL for every named study, figure, or market fact; state anything without a source URL as a model estimate, never as an established fact.",
                 "Return strict JSON only. Do not wrap it in markdown.",
                 "The JSON must match this shape: {\"text\":\"...\",\"thinking\":[\"...\"],\"widget\":\"creative_brief\",\"brief\":{\"title\":\"...\",\"narrative\":\"...\",\"metrics\":[{\"label\":\"...\",\"value\":\"...\"}],\"alerts\":[{\"level\":\"...\",\"text\":\"...\"}],\"strategy\":[\"...\"]},\"suggestions\":[\"...\"]}.",
               ].join(" "),
@@ -466,7 +651,7 @@ export class CreativeIntelligenceService {
                 "Use web search for current public evidence. Do not use examples, demo data, or invented IDs.",
                 "Return strict JSON only. Do not wrap it in markdown.",
                 "Return this shape: {\"brand\":{\"name\":\"...\",\"category\":\"...\"},\"owned_ads\":[{\"id\":\"...\",\"brand_id\":\"...\",\"platform\":\"meta|tiktok\",\"title\":\"...\",\"health\":\"thriving|aging|fatiguing|declining\",\"health_score\":0.7,\"run_days\":12,\"reach_bucket\":\"high|mid|low\",\"variant_count\":1,\"creative_family_id\":\"...\"}],\"competitor_ads\":[same shape],\"meta_signals\":[\"source-backed signal ...\"]}.",
-                "Return at least one source-backed meta signal; include multiple signals when the search evidence supports them.",
+                "Return at least one source-backed meta signal; include multiple signals when the search evidence supports them. Include the full source URL inside each meta signal string; a signal without a URL must be phrased as a model estimate.",
                 "Use concise source-backed titles, public competitor observations, and conservative health scores from visible recency, repetition, and saturation signals.",
               ].join(" "),
             },
@@ -864,6 +1049,15 @@ function defaultQwenBaseUrl(workspaceId: string | undefined): string {
     return `https://${id}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`;
   }
   return "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
+}
+
+const SOURCE_CHECK_TIMEOUT_MS = 6000;
+const MAX_SOURCE_CHECKS = 6;
+
+function extractUrls(text: string): string[] {
+  const matches = text.match(/https?:\/\/[^\s"'<>)\]}]+/g) ?? [];
+  const cleaned = matches.map((url) => url.replace(/[.,;:]+$/, ""));
+  return [...new Set(cleaned)].slice(0, MAX_SOURCE_CHECKS);
 }
 
 function parseJsonContent(content: string): unknown {

@@ -44,17 +44,21 @@ Show the returned brief:
 
 State that the API rebuilds the latest overview first, then grounds the Qwen prompt in the live portfolio signals before asking for a brief.
 
-## 1:50 to 2:20 - Human Checkpoint
+## 1:50 to 2:20 - Self-Audit and Enforced Approval
 
-Show the operator approval gate.
+Show the "Agent self-audit" trust panel. This is the differentiator — spend real time here.
 
 Explain:
 
-- the brief is not auto-shipped
-- an operator must confirm brand fit, platform fit, and novelty
-- this is the human-in-the-loop checkpoint required for production workflows
+- after producing the brief, a second adversarial Qwen pass fact-checks it
+- every cited source URL is fetched live; unreachable citations are flagged in the packet
+- every claim is graded verified, unverified, or model-estimate with an auditor confidence score
+- the agent catches its own hallucinations before the human ever sees the packet
 
-Optionally copy the handoff note to show how the approved brief is packaged for the creative team.
+Then demonstrate the enforced gate:
+
+- click Approve without acknowledging the checkpoints — the ledger rejects it with a 409
+- acknowledge the checkpoints and approve — the decision is recorded with operator, note, and timestamp in an append-only audit trail
 
 ## 2:20 to 2:45 - Engineering and Cloud Proof
 

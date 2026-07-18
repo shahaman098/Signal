@@ -4,13 +4,25 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
+import re
+import threading
 import urllib.error
 import urllib.request
+import uuid
+from datetime import datetime, timezone
 
 
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", os.getenv("FC_SERVER_PORT", "9000")))
 QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen-plus")
+
+SOURCE_CHECK_TIMEOUT_S = 6
+MAX_SOURCE_CHECKS = 5
+
+# Human-review ledger for this instance: every run stays pending until an
+# operator posts an explicit decision with acknowledged checkpoints.
+RUNS = {}
+RUNS_LOCK = threading.Lock()
 
 
 def qwen_base_url() -> str:
@@ -62,6 +74,90 @@ def qwen_chat(messages):
     return json.loads(content.strip())
 
 
+def extract_urls(text):
+    matches = re.findall(r"https?://[^\s\"'<>\)\]\}]+", text)
+    cleaned = []
+    for url in matches:
+        url = url.rstrip(".,;:")
+        if url not in cleaned:
+            cleaned.append(url)
+    return cleaned[:MAX_SOURCE_CHECKS]
+
+
+def verify_sources(urls):
+    checks = []
+    for url in urls:
+        status = None
+        reachable = False
+        for method in ("HEAD", "GET"):
+            request = urllib.request.Request(url, method=method)
+            try:
+                with urllib.request.urlopen(request, timeout=SOURCE_CHECK_TIMEOUT_S) as response:
+                    status = response.status
+                    reachable = response.status < 400
+                break
+            except urllib.error.HTTPError as exc:
+                status = exc.code
+                if exc.code in (405, 501) and method == "HEAD":
+                    continue
+                reachable = exc.code < 400
+                break
+            except Exception:
+                status = None
+                reachable = False
+                break
+        checks.append({"url": url, "reachable": reachable, "httpStatus": status})
+    return checks
+
+
+def audit_packet(result, sources):
+    """Adversarial second pass: grade every claim before the operator sees it."""
+    try:
+        audit = qwen_chat(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Signal's adversarial evidence auditor. Another agent produced the attached creative "
+                        "recommendation packet; your only job is to find its weaknesses before a human operator reviews it. "
+                        "Grade each distinct factual claim: 'verified' only when a reachable cited source or your own web "
+                        "search confirms it, 'unverified' when a citation cannot be confirmed, 'model_estimate' when it is "
+                        "a plausible model-derived figure with no source. Named studies, surveys, sample sizes, and "
+                        "market-share figures without a reachable source URL must never be graded 'verified'. Return strict "
+                        'JSON only: {"confidence":0.0,"verdict":"evidence_verified|operator_caution",'
+                        '"claims":[{"claim":"...","grade":"verified|unverified|model_estimate","note":"..."}],'
+                        '"cautions":["..."]}. Use operator_caution whenever any claim is unverified or the '
+                        "recommendation depends mostly on model estimates."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps({"packet": result, "sourceChecks": sources}),
+                },
+            ]
+        )
+        verdict = audit.get("verdict")
+        if verdict not in ("evidence_verified", "operator_caution"):
+            raise RuntimeError(f"auditor returned invalid verdict: {verdict!r}")
+        return {
+            "verdict": verdict,
+            "confidence": float(audit.get("confidence", 0)),
+            "auditModel": QWEN_MODEL,
+            "claims": audit.get("claims", []),
+            "sources": sources,
+            "cautions": audit.get("cautions", []),
+        }
+    except Exception as exc:
+        return {
+            "verdict": "audit_unavailable",
+            "confidence": 0,
+            "auditModel": QWEN_MODEL,
+            "claims": [],
+            "sources": sources,
+            "cautions": [f"Adversarial audit pass failed, so treat every claim as unverified: {exc}"],
+        }
+
+
 def autopilot(prompt=None):
     brand = os.getenv("SIGNAL_TARGET_BRAND_NAME", "Celsius")
     category = os.getenv("SIGNAL_TARGET_CATEGORY", "energy drinks")
@@ -73,6 +169,8 @@ def autopilot(prompt=None):
                 "content": (
                     "You are Signal's Qwen Cloud creative autopilot agent. Use web search for current public "
                     "owned and competitor creative/ad signals. Do not use examples, demo data, or invented facts. "
+                    "Cite a full source URL for every named study, figure, or market fact; state anything without "
+                    "a source URL as a model estimate, never as an established fact. "
                     "Return strict JSON with keys: text, thinking, widget, brief, suggestions, recommendation, "
                     "evidence, humanCheckpoints, nextActions."
                 ),
@@ -90,14 +188,71 @@ def autopilot(prompt=None):
             },
         ]
     )
-    return {
+
+    sources = verify_sources(extract_urls(json.dumps(result)))
+    trust = audit_packet(result, sources)
+
+    run_id = str(uuid.uuid4())
+    packet = {
+        "runId": run_id,
         "mode": "live",
         "status": "pending_human_review",
         "provider": "Alibaba Cloud Model Studio",
         "model": QWEN_MODEL,
         "goal": mission,
         "result": result,
+        "trust": trust,
     }
+    with RUNS_LOCK:
+        RUNS[run_id] = {
+            "runId": run_id,
+            "goal": mission,
+            "trustVerdict": trust["verdict"],
+            "trustConfidence": trust["confidence"],
+            "status": "pending_human_review",
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "decision": None,
+        }
+    return packet
+
+
+DECISION_STATUS = {
+    "approve": "approved",
+    "reject": "rejected",
+    "request_revision": "revision_requested",
+}
+
+
+def decide_run(run_id, body):
+    action = body.get("action")
+    operator = str(body.get("operator", "")).strip()
+    if action not in DECISION_STATUS:
+        return 400, {"error": "validation_error", "message": "action must be approve, reject, or request_revision"}
+    if len(operator) < 2:
+        return 400, {"error": "validation_error", "message": "operator name is required"}
+    with RUNS_LOCK:
+        record = RUNS.get(run_id)
+        if record is None:
+            return 404, {"error": "run_not_found", "message": f"No autopilot run is registered with id {run_id}."}
+        if record["status"] != "pending_human_review":
+            return 409, {
+                "error": "review_state_conflict",
+                "message": f"Run {run_id} was already decided as {record['status']}; the audit trail is append-only.",
+            }
+        if action == "approve" and body.get("acknowledgedCheckpoints") is not True:
+            return 409, {
+                "error": "review_state_conflict",
+                "message": "Approval requires acknowledgedCheckpoints: true. Confirm every human checkpoint first.",
+            }
+        record["status"] = DECISION_STATUS[action]
+        record["decision"] = {
+            "action": action,
+            "operator": operator,
+            "note": str(body.get("note", "")).strip() or None,
+            "acknowledgedCheckpoints": body.get("acknowledgedCheckpoints") is True,
+            "decidedAt": datetime.now(timezone.utc).isoformat(),
+        }
+        return 200, dict(record)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -108,14 +263,26 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/health":
             self.respond(200, {"status": "ok", "service": "signal-qwen-agent"})
             return
+        if self.path == "/api/creative/runs":
+            with RUNS_LOCK:
+                runs = sorted(RUNS.values(), key=lambda record: record["createdAt"], reverse=True)
+            self.respond(200, {"runs": runs})
+            return
         self.respond(404, {"error": "not_found"})
 
     def do_POST(self):
+        length = int(self.headers.get("content-length", "0"))
+        body = json.loads(self.rfile.read(length).decode("utf-8") or "{}") if length else {}
+
+        decision_match = re.fullmatch(r"/api/creative/runs/([0-9a-f-]+)/decision", self.path)
+        if decision_match:
+            status, payload = decide_run(decision_match.group(1), body)
+            self.respond(status, payload)
+            return
+
         if self.path not in {"/api/creative/autopilot", "/api/creative/radar"}:
             self.respond(404, {"error": "not_found"})
             return
-        length = int(self.headers.get("content-length", "0"))
-        body = json.loads(self.rfile.read(length).decode("utf-8") or "{}") if length else {}
         try:
             self.respond(200, autopilot(body.get("prompt")))
         except Exception as exc:
@@ -250,6 +417,34 @@ def landing_page():
       cursor: pointer;
     }
     button:disabled { opacity: 0.58; cursor: wait; }
+    .trust {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(143, 216, 194, 0.28);
+      display: grid;
+      gap: 6px;
+      font: 600 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .gate {
+      margin-top: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .gate input[type="text"] {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font: 14px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: rgba(255,255,255,0.7);
+      color: var(--ink);
+    }
+    .ack { font: 600 13px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; display: flex; gap: 8px; align-items: center; }
+    .gate-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .gate-button { margin-top: 0; }
+    .gate-button-reject { background: var(--accent-dark); }
+    .review-note { font: 600 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent-dark); }
     pre {
       overflow: auto;
       white-space: pre-wrap;
@@ -275,10 +470,11 @@ def landing_page():
       <div class="card">
         <span class="eyebrow">Alibaba Cloud Function Compute + Qwen Model Studio</span>
         <h1>Signal Qwen Cloud Agent</h1>
-        <p>Live creative autopilot for Celsius and energy drinks. The hosted endpoint calls Qwen Model Studio with web search enabled and returns an operator-reviewed agent packet. No demo fixture or fake fallback is served.</p>
+        <p>Live self-auditing creative autopilot for Celsius and energy drinks. The hosted endpoint calls Qwen Model Studio with web search enabled, then a second adversarial Qwen pass fact-checks the packet and every cited source URL is verified against the live web before the run is queued for human approval. No demo fixture or fake fallback is served.</p>
         <div class="checks">
           <div class="check">Live mode response required</div>
-          <div class="check">Human review checkpoint required</div>
+          <div class="check">Adversarial self-audit with live source verification</div>
+          <div class="check">Enforced human approval gate with audit trail</div>
           <div class="check">Provider must be Alibaba Cloud Model Studio</div>
         </div>
       </div>
@@ -286,6 +482,16 @@ def landing_page():
         <label for="prompt" class="eyebrow">Run Agent</label>
         <textarea id="prompt">Produce a concise live creative autopilot brief for Celsius in energy drinks. Include current public competitor signals and one operator-reviewed next step.</textarea>
         <button id="run">Run Qwen Autopilot</button>
+        <div id="trust" class="trust" hidden></div>
+        <div id="gate" class="gate" hidden>
+          <input id="operator" type="text" placeholder="Operator name" value="Judge">
+          <label class="ack"><input id="ack" type="checkbox"> I reviewed every human checkpoint</label>
+          <div class="gate-actions">
+            <button id="approve" class="gate-button">Approve handoff</button>
+            <button id="reject" class="gate-button gate-button-reject">Reject</button>
+          </div>
+          <div id="review" class="review-note"></div>
+        </div>
         <pre id="result">Click Run Qwen Autopilot to call /api/creative/autopilot.</pre>
       </div>
     </section>
@@ -294,9 +500,55 @@ def landing_page():
     const button = document.getElementById("run");
     const result = document.getElementById("result");
     const prompt = document.getElementById("prompt");
+    const trust = document.getElementById("trust");
+    const gate = document.getElementById("gate");
+    const review = document.getElementById("review");
+    let currentRunId = null;
+
+    function renderTrust(packet) {
+      const report = packet.trust;
+      if (!report) return;
+      const grades = { verified: 0, unverified: 0, model_estimate: 0 };
+      for (const claim of report.claims || []) {
+        if (claim.grade in grades) grades[claim.grade] += 1;
+      }
+      const liveSources = (report.sources || []).filter((s) => s.reachable).length;
+      trust.hidden = false;
+      trust.innerHTML =
+        '<strong>Self-audit: ' + String(report.verdict).replaceAll("_", " ") + "</strong>" +
+        "<span>Auditor confidence " + Math.round((report.confidence || 0) * 100) + "%" +
+        " · " + grades.verified + " verified / " + grades.unverified + " unverified / " + grades.model_estimate + " model-estimate claims" +
+        " · " + liveSources + "/" + (report.sources || []).length + " cited sources reachable</span>";
+      gate.hidden = false;
+      review.textContent = "";
+    }
+
+    async function decide(action) {
+      if (!currentRunId) return;
+      const body = {
+        action,
+        operator: document.getElementById("operator").value || "Judge",
+        acknowledgedCheckpoints: document.getElementById("ack").checked,
+      };
+      const response = await fetch("/api/creative/runs/" + currentRunId + "/decision", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json();
+      review.textContent = response.ok
+        ? "Recorded: " + payload.status + " by " + payload.decision.operator + " at " + payload.decision.decidedAt
+        : payload.message || payload.error;
+    }
+
+    document.getElementById("approve").addEventListener("click", () => decide("approve"));
+    document.getElementById("reject").addEventListener("click", () => decide("reject"));
+
     button.addEventListener("click", async () => {
       button.disabled = true;
-      result.textContent = "Calling Qwen through Alibaba Cloud Model Studio...";
+      trust.hidden = true;
+      gate.hidden = true;
+      result.textContent = "Calling Qwen through Alibaba Cloud Model Studio (agent run + adversarial audit)...";
       try {
         const response = await fetch("/api/creative/autopilot", {
           method: "POST",
@@ -304,6 +556,8 @@ def landing_page():
           body: JSON.stringify({ prompt: prompt.value })
         });
         const payload = await response.json();
+        currentRunId = payload.runId || null;
+        renderTrust(payload);
         result.textContent = JSON.stringify(payload, null, 2);
       } catch (error) {
         result.textContent = error instanceof Error ? error.message : String(error);
