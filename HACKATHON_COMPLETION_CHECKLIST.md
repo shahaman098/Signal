@@ -18,7 +18,7 @@ This checklist reflects the live Devpost requirements for the **Global AI Hackat
 - Alibaba Cloud deployment proof: `PUBLIC PROOF LINKS FILLED`
 - Live endpoint check: `npm run live:check`
 - Architecture doc: `DONE`
-- Local demo video: `GENERATED (approximately 63 seconds)`
+- Local demo video: `GENERATED (approximately 67 seconds, includes the self-audit trust panel and enforced approval gate)`
 - Public demo video URL: `MISSING`
 - Public links: `FILLED`
 

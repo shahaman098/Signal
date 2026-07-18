@@ -353,7 +353,7 @@ The script records the browser flow with Playwright and writes:
 output/demo/signal-qwen-demo.mp4
 ```
 
-The current generated video is approximately 63 seconds, below the official three-minute limit. `ffmpeg` is required for the final MP4; macOS `say` is used for narration when available. The `output` directory is intentionally ignored by Git.
+The current generated video is approximately 67 seconds, below the official three-minute limit, and walks through the live packet, the self-audit trust panel, and the enforced approval gate. `ffmpeg` is required for the final MP4; macOS `say` is used for narration when available. The `output` directory is intentionally ignored by Git.
 
 Before submission, upload the MP4 as a publicly visible YouTube, Vimeo, or Youku video, add the URL to [HACKATHON_PROOF.md](./docs/HACKATHON_PROOF.md), and rerun `npm run submission:check`.
 

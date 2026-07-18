@@ -12,7 +12,14 @@ const narrationPath = path.join(outDir, "narration.txt");
 const audioPath = path.join(outDir, "narration.aiff");
 const finalPath = path.join(outDir, "signal-qwen-demo.mp4");
 const port = process.env.DEMO_PORT ? Number(process.env.DEMO_PORT) : await findAvailablePort(4177);
-const appUrl = `http://127.0.0.1:${port}/creative`;
+// Use localhost, not 127.0.0.1: Next dev blocks cross-origin dev resources
+// from other hostnames, which silently prevents client hydration.
+const appUrl = `http://localhost:${port}/creative`;
+
+// Seconds of recording to drop from the head of the final cut so the video
+// starts just before the first live packet lands instead of sitting on the
+// loading state for the full multi-minute agent run.
+let headTrimSeconds = 0;
 
 mkdirSync(videoDir, { recursive: true });
 rmSync(videoDir, { recursive: true, force: true });
@@ -139,8 +146,14 @@ async function recordBrowserFlow() {
   const page = await context.newPage();
   page.setDefaultTimeout(90000);
 
+  const recordingStartedAt = Date.now();
   await page.goto(appUrl, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle").catch(() => undefined);
+  // The dashboard now loads the first live packet client-side; wait for the
+  // self-audit trust panel before recording the tour (a live run plus the
+  // adversarial audit can take a few minutes).
+  await page.waitForSelector("#trust-audit", { timeout: 360000 }).catch(() => undefined);
+  headTrimSeconds = Math.max(0, (Date.now() - recordingStartedAt) / 1000 - 6);
   await page.waitForTimeout(3000);
 
   await page.screenshot({ path: path.join(outDir, "creative-dashboard.png"), fullPage: true });
@@ -167,11 +180,23 @@ async function recordBrowserFlow() {
   await smoothScroll(page, 720, 5);
   await page.waitForTimeout(1600);
 
+  const trustPanel = page.locator("#trust-audit");
+  if (await trustPanel.count()) {
+    await trustPanel.scrollIntoViewIfNeeded().catch(() => undefined);
+    await page.waitForTimeout(2200);
+  }
+
   const checkboxes = page.locator('input[type="checkbox"]');
   const checkboxCount = await checkboxes.count();
   for (let i = 0; i < Math.min(checkboxCount, 3); i += 1) {
     await checkboxes.nth(i).check({ force: true }).catch(() => undefined);
     await page.waitForTimeout(500);
+  }
+
+  const approveHandoff = page.getByRole("button", { name: "Approve handoff" });
+  if (await approveHandoff.count()) {
+    await approveHandoff.click().catch(() => undefined);
+    await page.waitForTimeout(1800);
   }
 
   const approvalButton = page.getByRole("button", { name: "Approve for handoff" });
@@ -224,9 +249,12 @@ async function buildFinalVideo() {
     return;
   }
 
+  const trimArgs = headTrimSeconds > 0 ? ["-ss", headTrimSeconds.toFixed(1)] : [];
+
   if (existsSync(audioPath)) {
     await run("ffmpeg", [
       "-y",
+      ...trimArgs,
       "-i", webm,
       "-i", audioPath,
       "-c:v", "libx264",
@@ -238,6 +266,7 @@ async function buildFinalVideo() {
   } else {
     await run("ffmpeg", [
       "-y",
+      ...trimArgs,
       "-i", webm,
       "-c:v", "libx264",
       "-pix_fmt", "yuv420p",
